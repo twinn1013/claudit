@@ -103,6 +103,16 @@ describe("EC1 — cross-source * / * both mutating", () => {
   });
 });
 
+describe("EC1b — RTK command is treated as a known mutating hook", () => {
+  it("classifies `rtk hook claude` as mutating without local script source", () => {
+    const script: HookScript = {
+      command: "rtk hook claude",
+      kind: "command",
+    };
+    expect(classifyHookScript(script)).toBe("mutates");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // EC2: Edit|Write vs Edit both mutating → collision
 // ---------------------------------------------------------------------------

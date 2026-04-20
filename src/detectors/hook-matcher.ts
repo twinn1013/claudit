@@ -28,6 +28,10 @@ export function classifyHookScript(script: HookScript): MutationClass {
   // Delta 2c: non-command kinds cannot be statically analysed.
   if (script.kind !== "command") return "unknown";
 
+  if (isKnownMutatingHookCommand(script.command)) {
+    return "mutates";
+  }
+
   if (!script.scriptSource || script.scriptSource.length === 0) {
     return "unknown";
   }
@@ -52,6 +56,15 @@ export function classifyHookScript(script: HookScript): MutationClass {
   return "readonly";
 }
 
+function isKnownMutatingHookCommand(command: string): boolean {
+  const normalized = command.trim();
+  if (normalized.length === 0) return false;
+
+  return /(?:^|\s)(?:\S+\/)?rtk\s+hook\s+claude(?:\s|$)/.test(
+    ` ${normalized} `,
+  );
+}
+
 function stripComments(source: string): string {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, " ")
@@ -62,6 +75,8 @@ function stripComments(source: string): string {
 interface HookAtMatcher {
   /** Entity string used in entities_involved. */
   entity: string;
+  /** False when the hook comes from a currently disabled plugin. */
+  enabled: boolean;
   /** Hook source scope. */
   source: HookSource;
   event: string;
@@ -81,53 +96,91 @@ export class HookMatcherDetector implements Detector {
     const collisions: Collision[] = [];
 
     for (const group of groups) {
-      if (group.length < 2) continue;
-      const mutates = group.filter((e) => e.classification === "mutates");
-      const unknowns = group.filter((e) => e.classification === "unknown");
-
-      let confidence: Collision["confidence"] | null = null;
-      let severity: Collision["severity"] = "warning";
-      let explanation = "";
-
-      if (mutates.length >= 2) {
-        confidence = "definite";
-        severity = "critical";
-        explanation = `${mutates.length} hooks mutate updatedInput on the same event+matcher; later hooks overwrite earlier ones.`;
-      } else if (mutates.length >= 1 && unknowns.length >= 1) {
-        confidence = "possible";
-        explanation =
-          "One hook mutates updatedInput while a co-registered hook could not be statically analysed; mutual interference cannot be ruled out.";
+      const activeCollision = buildCollision(group.filter((entry) => entry.enabled));
+      if (activeCollision) {
+        collisions.push(activeCollision);
       }
-      if (!confidence) continue;
 
-      // Collect all matchers in this group for the message.
-      const distinctMatchers = [...new Set(group.map((e) => e.rawMatcher))];
-      const matcherLabel =
-        distinctMatchers.length === 1
-          ? distinctMatchers[0]
-          : distinctMatchers.join(" ∩ ");
+      if (!group.some((entry) => !entry.enabled)) continue;
 
-      const event = group[0].event;
-      const sources = [...new Set(group.map((e) => e.entity))].join(", ");
-
-      collisions.push({
-        category: "hook-matcher",
-        severity,
-        confidence,
-        entities_involved: group.map((e) => e.entity),
-        suggested_fix: [
-          {
-            command: "claude plugin inspect <plugin-name>",
-            scope: "plugin",
-            safety_level: "safe",
-            rationale: `Review the hooks for event ${event} with matcher "${matcherLabel}" across: ${sources}.`,
-          },
-        ],
-        message: `Hook matcher interference on ${event}/${matcherLabel}: ${explanation}`,
-      });
+      const disabledCollision = buildCollision(group, { includesDisabled: true });
+      if (
+        disabledCollision &&
+        !sameEntitySet(
+          activeCollision?.entities_involved ?? [],
+          disabledCollision.entities_involved,
+        )
+      ) {
+        collisions.push(disabledCollision);
+      }
     }
     return collisions;
   }
+}
+
+function buildCollision(
+  group: HookAtMatcher[],
+  options: { includesDisabled?: boolean } = {},
+): Collision | null {
+  if (group.length < 2) return null;
+
+  const mutates = group.filter((entry) => entry.classification === "mutates");
+  const unknowns = group.filter((entry) => entry.classification === "unknown");
+
+  let confidence: Collision["confidence"] | null = null;
+  let severity: Collision["severity"] = "warning";
+  let explanation = "";
+
+  if (mutates.length >= 2) {
+    confidence = "definite";
+    severity = "critical";
+    explanation = `${mutates.length} hooks mutate updatedInput on the same event+matcher; later hooks overwrite earlier ones.`;
+  } else if (mutates.length >= 1 && unknowns.length >= 1) {
+    confidence = "possible";
+    explanation =
+      "One hook mutates updatedInput while a co-registered hook could not be statically analysed; mutual interference cannot be ruled out.";
+  }
+  if (!confidence) return null;
+
+  if (options.includesDisabled) {
+    confidence = "possible";
+    severity = "warning";
+    explanation +=
+      " At least one participating hook comes from a disabled plugin, so the interference would activate on re-enable.";
+  }
+
+  const distinctMatchers = [...new Set(group.map((entry) => entry.rawMatcher))];
+  const matcherLabel =
+    distinctMatchers.length === 1
+      ? distinctMatchers[0]
+      : distinctMatchers.join(" ∩ ");
+
+  const event = group[0].event;
+  const entities = [...new Set(group.map((entry) => entry.entity))];
+  const sources = entities.join(", ");
+
+  return {
+    category: "hook-matcher",
+    severity,
+    confidence,
+    entities_involved: entities,
+    suggested_fix: [
+      {
+        command: "claude plugin inspect <plugin-name>",
+        scope: "plugin",
+        safety_level: "safe",
+        rationale: `Review the hooks for event ${event} with matcher "${matcherLabel}" across: ${sources}.`,
+      },
+    ],
+    message: `Hook matcher interference on ${event}/${matcherLabel}: ${explanation}`,
+  };
+}
+
+function sameEntitySet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const leftSorted = [...left].sort();
+  const rightSorted = [...right].sort();
+  return leftSorted.every((entity, index) => entity === rightSorted[index]);
 }
 
 /** Flatten plugin-sourced and settings-sourced hooks into a single list. */
@@ -145,6 +198,7 @@ function flattenAllHooks(snapshot: SnapshotData): HookAtMatcher[] {
           const entity = `${plugin.name}:${event}:${rawMatcher}`;
           entries.push({
             entity,
+            enabled: plugin.enabled,
             source: reg.source,
             event,
             rawMatcher,
@@ -167,6 +221,7 @@ function flattenAllHooks(snapshot: SnapshotData): HookAtMatcher[] {
       const entity = `${entry.source}:${entry.event}:${rawMatcher}`;
       entries.push({
         entity,
+        enabled: true,
         source: entry.source,
         event: entry.event,
         rawMatcher,

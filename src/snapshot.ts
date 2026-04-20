@@ -1094,12 +1094,29 @@ function applyEnabledPluginsFilter(
   enabledMap: Record<string, boolean>,
 ): PluginSummary[] {
   return plugins.map((p) => {
-    // Empty map means no overrides -> keep existing enabled: true.
-    if (Object.prototype.hasOwnProperty.call(enabledMap, p.name)) {
-      return { ...p, enabled: enabledMap[p.name] };
+    const enabled = resolveEnabledPluginState(p.name, enabledMap);
+    if (enabled !== null) {
+      return { ...p, enabled };
     }
     return p;
   });
+}
+
+function resolveEnabledPluginState(
+  pluginName: string,
+  enabledMap: Record<string, boolean>,
+): boolean | null {
+  if (Object.prototype.hasOwnProperty.call(enabledMap, pluginName)) {
+    return enabledMap[pluginName];
+  }
+
+  for (const [key, value] of Object.entries(enabledMap)) {
+    if (key.split("@", 1)[0] === pluginName) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 function commandBaseName(pathOrName: string): string | null {
@@ -1258,4 +1275,3 @@ function samePluginContent(a: PluginSummary, b: PluginSummary): boolean {
   const strip = (s: PluginSummary) => ({ ...s, pluginRoot: "" });
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b));
 }
-
