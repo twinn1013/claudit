@@ -134,24 +134,27 @@ Rationale: `git log --oneline --grep='v2-snapshot'` cleanly separates v0.2 snaps
 - **Goal:** Evolve the type schema to support 5-scope hook sources, plugin enablement, and corrected agent naming before any module rewrites depend on these types.
 - **Deliverables:**
   - `src/types.ts` — modified:
-    - Add `HookSource` enum with 6 values: `plugin-cache`, `plugin-marketplace`, `user-settings`, `user-settings-local`, `project-settings`, `project-settings-local`.
+    - Add `HookSource` enum with 7 values: `plugin-cache`, `plugin-marketplace`, `user-settings`, `user-settings-local`, `project-settings`, `project-settings-local`, `user-managed`. **(Delta 2a — 2026-04-20 post-approval patch.)**
     - Add `source: HookSource` field to `HookRegistration`.
     - Add `source: HookSource` and `enabled: boolean` fields to `PluginSummary`.
     - Rename `PluginAgent.type` to `PluginAgent.name` (breaking change — all consumers updated in subsequent stages).
     - Add `SettingsHookEntry` type: `{ event: string; matcher?: string; hooks: HookScript[]; source: HookSource }` for non-plugin hooks from user/project settings.
+    - Extend `HookScript` type with `kind: 'command' | 'prompt' | 'agent' | 'http' | 'unknown'` discriminator and optional `rawConfig?: unknown` field. Existing command hooks get `kind: 'command'`; non-command hook types are preserved with `kind` set and `rawConfig` carrying the original entry. Detectors MUST treat non-command `kind` values as `confidence: unknown` (no silent drop). **(Delta 2c — 2026-04-20 post-approval patch.)**
     - Add `settingsHooks: SettingsHookEntry[]` to `SnapshotData` (settings-sourced hooks that are not plugin-associated).
   - `tests/types-v2.test.ts` — type-level tests:
-    - Verify `HookSource` enum has exactly 6 values.
+    - Verify `HookSource` enum has exactly 7 values (including `user-managed`).
     - Verify `PluginAgent` has `name` field, no `type` field.
     - Verify `PluginSummary` includes `source` and `enabled`.
     - Verify `HookRegistration` includes `source`.
+    - Verify `HookScript` has `kind` field accepting all 5 discriminator values and optional `rawConfig`.
 - **Effort:** S
 - **`/ccg`:** no
 - **Exit criteria:**
-  - [ ] `HookSource` enum exports 6 values: `plugin-cache`, `plugin-marketplace`, `user-settings`, `user-settings-local`, `project-settings`, `project-settings-local`.
+  - [ ] `HookSource` enum exports 7 values: `plugin-cache`, `plugin-marketplace`, `user-settings`, `user-settings-local`, `project-settings`, `project-settings-local`, `user-managed`. **(Delta 2a.)**
   - [ ] `PluginAgent` interface has `name: string` field and no `type` field.
   - [ ] `PluginSummary` has `source: HookSource` and `enabled: boolean`.
   - [ ] `HookRegistration` has `source: HookSource`.
+  - [ ] `HookScript` has `kind: 'command' | 'prompt' | 'agent' | 'http' | 'unknown'` and optional `rawConfig?: unknown`. **(Delta 2c.)**
   - [ ] `SnapshotData` has `settingsHooks: SettingsHookEntry[]`.
   - [ ] `npx tsc --noEmit` passes (all existing consumers updated with `PluginAgent.type` -> `name` rename — search-and-replace across detectors and tests).
   - [ ] All existing tests pass (rename is a global find-replace; no logic change).
@@ -178,6 +181,9 @@ Rationale: `git log --oneline --grep='v2-snapshot'` cleanly separates v0.2 snaps
   - [ ] Fixture mimicking `~/.claude/plugins/cache/omc/oh-my-claudecode/4.11.6/` is discovered at correct depth.
   - [ ] Fixture with `plugins/marketplaces/omc/` is treated as plugin root (hooks, skills, agents captured).
   - [ ] `captureUserSettings()` returns hooks from `settings.json` fixture containing `rtk hook claude` PreToolUse entry.
+  - [ ] **(Delta 1)** `captureUserSettings()` probes `~/.claude.json` at home root. If present, its `.mcpServers` field is read and merged into the user-level MCP config surfaced to the MCP detector. If absent, the probe skips silently (no throw, no warning). Fixture: `~/.claude.json` with `{"mcpServers": {"search": {...}}}` results in `search` appearing in the user-level MCP server list.
+  - [ ] **(Delta 2a)** `captureUserSettings()` probes a managed-settings path (enterprise-policy location). Hooks discovered there are tagged `source: 'user-managed'` on both `HookRegistration` and `SettingsHookEntry`. If the path is absent, the probe skips silently. Fixture: managed settings file with a `PreToolUse` hook produces a `SettingsHookEntry` whose `source === 'user-managed'`.
+  - [ ] **(Delta 2c)** `captureUserSettings()` and `captureProjectSettings()` preserve non-command hook entries (entries whose `type` ∈ `{"prompt", "agent", "http"}`) as `HookScript` with `kind` set to the corresponding discriminator and `rawConfig` carrying the original entry object. Unknown `type` strings yield `kind: 'unknown'` with `rawConfig` preserved. No silent data loss — fixture with one `prompt` hook and one `http` hook in `settings.json` produces two `HookScript` entries with correct `kind` values, each retaining the original config under `rawConfig`.
   - [ ] `captureProjectSettings()` returns hooks from `<cwd>/.claude/settings.json` fixture.
   - [ ] Plugin with `enabledPlugins: {"foo": false}` is tagged `enabled: false` in snapshot.
   - [ ] `plugin.json` with `"skills": "./skills/"` resolves to skill list by walking the directory.

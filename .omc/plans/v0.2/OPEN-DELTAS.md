@@ -1,5 +1,16 @@
 # v0.2 Plan — Open Deltas (Post-Approval Audit, 2026-04-20)
 
+**STATUS: CLOSED — 2026-04-20.** Both deltas resolved by user decision and folded into `iteration-2/01-planner-revised.md`:
+
+- **Delta 1 → Option A accepted.** `~/.claude.json` added to Stage 1 `captureUserSettings` MCP probe list.
+- **Delta 2 → Options A + C accepted.** `user-managed` added to `HookSource` enum; Stage 1 probes managed settings path. `HookScript.kind` discriminator + `rawConfig` preserved for non-command hook types; detectors treat non-command kinds as `confidence: unknown`.
+
+See `CONSENSUS.md` "Post-approval deltas accepted on 2026-04-20" section and Stages 0/1 of `iteration-2/01-planner-revised.md` for the in-plan encoding. Re-review was skipped per the additive-only rule (≤15 LOC each).
+
+---
+
+## Original audit below (frozen)
+
 The iteration-2 consensus plan is APPROVED (Architect + Critic). A post-approval audit against the external-review findings surfaced **2 partial closures** that the next session should decide on before Stage 0 executes.
 
 ## Delta 1 — MCP probe paths (Codex CRITICAL #1)

@@ -39,3 +39,17 @@ All 5 open questions (YAML parser, report wrapper, redaction scope, namespace po
 Hand off to `oh-my-claudecode:autopilot`. Autopilot detects `.omc/plans/v0.2/CONSENSUS.md` + `.omc/plans/v0.2/iteration-2/01-planner-revised.md` and skips Phase 0 + Phase 1, starting directly at Phase 2 (Execution).
 
 Autopilot MUST invoke CCG (Codex + Gemini) in Phase 4 per Section 5 of the revised plan — this is a hard guardrail, not optional.
+
+---
+
+## Post-approval deltas accepted on 2026-04-20
+
+Two additive deltas from `.omc/plans/v0.2/OPEN-DELTAS.md` are folded into the approved plan without re-review (both ≤15 LOC, additive-only per OPEN-DELTAS §4):
+
+- **Delta 1 (MCP probe paths — Option A):** Stage 1 `captureUserSettings` probes `~/.claude.json` at home root; if present, its `.mcpServers` is merged into user-level MCP config; if absent, skip silently. Covered by new Stage 1 exit criterion.
+- **Delta 2a (managed hook scope — Option A):** `HookSource` enum gains a 7th value `user-managed`. Stage 1 probes a managed settings path; discovered hooks are tagged `source: 'user-managed'`. Covered by Stage 0 + Stage 1 exit criteria.
+- **Delta 2c (non-command hook types — Option C):** `HookScript` gains `kind: 'command' | 'prompt' | 'agent' | 'http' | 'unknown'` and optional `rawConfig?: unknown`. Stage 1 preserves non-command hook entries with `kind` and `rawConfig`; detectors treat non-command kinds as `confidence: unknown` (no silent drop). Covered by Stage 0 + Stage 1 exit criteria.
+
+Deltas not adopted: Delta 1 Option B, Delta 2 Options B and D.
+
+`OPEN-DELTAS.md` is marked CLOSED.

@@ -9,3 +9,4 @@ coverage/
 .omc/sessions/
 .omc/logs/
 
+.omx/
