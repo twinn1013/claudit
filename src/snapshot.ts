@@ -167,10 +167,10 @@ export class Snapshot {
       ...userSettings.settingsHooks,
       ...projectSettings.settingsHooks,
     ];
-    const settingsMcpServers: McpServer[] = dedupeMcpByName([
-      ...userSettings.mcpServers,
-      ...projectSettings.mcpServers,
-    ]);
+    // User-level MCP servers (settings.json, settings.local.json, ~/.claude.json, managed).
+    const settingsMcpServers: McpServer[] = dedupeMcpByName(userSettings.mcpServers);
+    // Project-level MCP servers (project settings.json, settings.local.json, .mcp.json).
+    const projectMcpServers: McpServer[] = dedupeMcpByName(projectSettings.mcpServers);
 
     const pathBinaries = await this.capturePathBinaries(
       this.options.pathOverride ?? process.env.PATH ?? "",
@@ -181,6 +181,7 @@ export class Snapshot {
       projectRoot,
       plugins,
       settingsMcpServers,
+      projectMcpServers,
       settingsHooks,
       pathBinaries,
       capturedAt,
@@ -217,6 +218,7 @@ export class Snapshot {
       typeof (parsed as SnapshotData).capturedAt !== "string" ||
       !Array.isArray((parsed as SnapshotData).plugins) ||
       !Array.isArray((parsed as SnapshotData).settingsMcpServers) ||
+      !Array.isArray((parsed as SnapshotData).projectMcpServers) ||
       !Array.isArray((parsed as SnapshotData).settingsHooks) ||
       typeof (parsed as SnapshotData).pathBinaries !== "object"
     ) {
@@ -513,7 +515,7 @@ export class Snapshot {
     return out;
   }
 
-  /** Read `<projectRoot>/.claude/settings.json` + `...local.json`. */
+  /** Read `<projectRoot>/.claude/settings.json` + `...local.json` + `<projectRoot>/.mcp.json`. */
   private async captureProjectSettings(
     projectRoot: string,
   ): Promise<SettingsCapture> {
@@ -529,7 +531,29 @@ export class Snapshot {
       "project-settings-local",
       out,
     );
+    // Probe <projectRoot>/.mcp.json — project-level MCP config file.
+    await this.mergeProjectMcpFile(join(projectRoot, ".mcp.json"), out);
     return out;
+  }
+
+  /**
+   * Read a project-level `.mcp.json` and merge its `mcpServers` (or
+   * top-level server entries) into the capture's MCP list with
+   * `source: "project"`. Silent no-op when the file is absent.
+   */
+  private async mergeProjectMcpFile(
+    path: string,
+    into: SettingsCapture,
+  ): Promise<void> {
+    const parsed = await readJsonSafe(path, this.fs);
+    if (!parsed || typeof parsed !== "object") return;
+    const obj = parsed as Record<string, unknown>;
+    // Support both `{ mcpServers: { name: {...} } }` and `{ name: {...} }` layouts.
+    const candidate =
+      obj.mcpServers && typeof obj.mcpServers === "object"
+        ? (obj.mcpServers as Record<string, unknown>)
+        : obj;
+    into.mcpServers.push(...mcpServersFromObject(candidate, "project"));
   }
 
   private async mergeSettingsFile(

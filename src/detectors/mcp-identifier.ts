@@ -3,7 +3,7 @@ import type { Collision, McpServer, SnapshotData } from "../types.js";
 
 interface ServerOrigin {
   name: string;
-  origin: string;   // plugin name or "settings.json"
+  origin: string;   // plugin name, "user-settings", or "project-settings"
   tools: string[];
 }
 
@@ -36,10 +36,10 @@ export class McpIdentifierDetector implements Detector {
         entities_involved: uniqueOrigins.map((o) => `${o}:mcp:${name}`),
         suggested_fix: [
           {
-            command: `# rename or remove one registration of the "${name}" MCP server`,
+            command: "",
             scope: "global",
             safety_level: "manual-review",
-            rationale: `Server name "${name}" is registered by ${uniqueOrigins.length} sources (${uniqueOrigins.join(", ")}); the last-loaded registration wins.`,
+            rationale: `Server name "${name}" is registered by ${uniqueOrigins.length} sources (${uniqueOrigins.join(", ")}). Remove or rename one registration so only one source defines this server.`,
           },
         ],
         message: `MCP server name "${name}" is registered by ${uniqueOrigins.length} sources: ${uniqueOrigins.join(", ")}.`,
@@ -69,10 +69,10 @@ export class McpIdentifierDetector implements Detector {
         entities_involved: entities.sort(),
         suggested_fix: [
           {
-            command: `# rename tool "${tool}" in one of the servers listed above`,
+            command: "",
             scope: "plugin",
             safety_level: "manual-review",
-            rationale: `Tool name "${tool}" is exposed by ${distinctServers.size} different servers; if the MCP runtime does not namespace by server, invocations become ambiguous.`,
+            rationale: `Tool name "${tool}" is exposed by ${distinctServers.size} different servers. If the MCP runtime does not namespace by server name, invocations become ambiguous. Rename the tool in one of the servers listed above.`,
           },
         ],
         message: `Tool "${tool}" is exposed by ${distinctServers.size} distinct MCP servers.`,
@@ -85,13 +85,19 @@ export class McpIdentifierDetector implements Detector {
 
 function collectMcpServers(snapshot: SnapshotData): ServerOrigin[] {
   const out: ServerOrigin[] = [];
+  // Plugin-declared servers.
   for (const plugin of snapshot.plugins) {
     for (const m of plugin.mcpServers) {
       out.push({ name: m.name, origin: plugin.name, tools: m.tools });
     }
   }
+  // User-level settings servers (~/.claude/settings.json, ~/.claude.json, managed).
   for (const m of snapshot.settingsMcpServers) {
-    out.push({ name: m.name, origin: "settings.json", tools: m.tools });
+    out.push({ name: m.name, origin: "user-settings", tools: m.tools });
+  }
+  // Project-level servers (<projectRoot>/.mcp.json, .claude/settings*.json).
+  for (const m of snapshot.projectMcpServers) {
+    out.push({ name: m.name, origin: "project-settings", tools: m.tools });
   }
   return out;
 }

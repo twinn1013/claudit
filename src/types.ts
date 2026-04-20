@@ -147,7 +147,7 @@ export interface PluginAgent {
 export interface McpServer {
   name: string;
   tools: string[];
-  source: "plugin" | "settings";
+  source: "plugin" | "settings" | "project";
 }
 
 export interface PluginSummary {
@@ -167,6 +167,8 @@ export interface SnapshotData {
   projectRoot?: string;
   plugins: PluginSummary[];
   settingsMcpServers: McpServer[];
+  /** MCP servers discovered from project-level `.mcp.json` and `.claude/settings*.json`. */
+  projectMcpServers: McpServer[];
   settingsHooks: SettingsHookEntry[];
   pathBinaries: Record<string, string[]>;
   capturedAt: string;

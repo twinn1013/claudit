@@ -21,6 +21,7 @@ function emptySnapshot(overrides: Partial<SnapshotData> = {}): SnapshotData {
     projectRoot: undefined,
     plugins: [],
     settingsMcpServers: [],
+    projectMcpServers: [],
     settingsHooks: [],
     pathBinaries: {},
     capturedAt: new Date().toISOString(),

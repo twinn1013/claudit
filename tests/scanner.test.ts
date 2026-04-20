@@ -7,6 +7,7 @@ const emptySnapshot: SnapshotData = {
   globalRoot: "/tmp/noop",
   plugins: [],
   settingsMcpServers: [],
+  projectMcpServers: [],
   settingsHooks: [],
   pathBinaries: {},
   capturedAt: "2026-04-20T00:00:00.000Z",

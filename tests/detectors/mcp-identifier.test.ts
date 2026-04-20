@@ -47,7 +47,7 @@ describe("McpIdentifierDetector", () => {
     expect(definite).toHaveLength(1);
     expect(definite[0].entities_involved.sort()).toEqual([
       "plugin-a:mcp:github",
-      "settings.json:mcp:github",
+      "user-settings:mcp:github",
     ]);
   });
 

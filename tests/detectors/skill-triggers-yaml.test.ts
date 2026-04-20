@@ -31,6 +31,7 @@ function makeSnapshot(plugins: Partial<PluginSummary>[]): SnapshotData {
       ...p,
     })),
     settingsMcpServers: [],
+    projectMcpServers: [],
     settingsHooks: [],
     pathBinaries: {},
     capturedAt: new Date().toISOString(),
