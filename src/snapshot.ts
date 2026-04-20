@@ -20,10 +20,15 @@ export const defaultGlobalRoot = (): string => join(homedir(), ".claude");
 export const defaultSnapshotStorage = (): string =>
   join(homedir(), ".claude", "claudit", "snapshots");
 
+import {
+  HOOK_SCRIPT_MAX_BYTES as HOOK_SCRIPT_MAX_BYTES_CONST,
+  SNAPSHOT_FILE_MAX_BYTES,
+} from "./policies.js";
+
 /** Cap per-hook-script source read at 4KB for static analysis. */
-const HOOK_SCRIPT_MAX_BYTES = 4 * 1024;
+const HOOK_SCRIPT_MAX_BYTES = HOOK_SCRIPT_MAX_BYTES_CONST;
 /** Snapshot files must stay under 1MB. */
-export const SNAPSHOT_SIZE_LIMIT = 1024 * 1024;
+export const SNAPSHOT_SIZE_LIMIT = SNAPSHOT_FILE_MAX_BYTES;
 
 export interface SnapshotOptions {
   globalRoot?: string;
@@ -123,6 +128,17 @@ export class Snapshot {
   static async load(path: string, fsImpl: typeof fs = fs): Promise<Snapshot> {
     const raw = await fsImpl.readFile(path, "utf8");
     const parsed = JSON.parse(raw) as SnapshotData;
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      typeof (parsed as SnapshotData).fingerprint !== "string" ||
+      typeof (parsed as SnapshotData).capturedAt !== "string" ||
+      !Array.isArray((parsed as SnapshotData).plugins) ||
+      !Array.isArray((parsed as SnapshotData).settingsMcpServers) ||
+      typeof (parsed as SnapshotData).pathBinaries !== "object"
+    ) {
+      throw new Error(`Snapshot.load: ${path} is not a valid snapshot file`);
+    }
     const snap = new Snapshot({ fs: fsImpl });
     snap._data = parsed;
     return snap;
@@ -419,8 +435,23 @@ async function resolveHookScript(
   const candidate = stripQuotes(match[1]);
   const abs = resolve(pluginRoot, candidate);
   if (!(await pathExists(abs, fsImpl))) return { path: candidate };
+  // Symlink-containment guard: refuse to read a hook script whose realpath
+  // escapes the plugin root. Prevents a malicious plugin from pointing a
+  // hook at, say, /etc/passwd and seeing the first 4KB embedded in the
+  // snapshot report.
   try {
-    const buf = await fsImpl.readFile(abs);
+    const realAbs = await fsImpl.realpath(abs);
+    const realRoot = await fsImpl.realpath(pluginRoot);
+    if (
+      realAbs !== realRoot &&
+      !realAbs.startsWith(realRoot + sep)
+    ) {
+      return { path: abs };
+    }
+    // Only hash/read plain regular files.
+    const stat = await fsImpl.stat(realAbs);
+    if (!stat.isFile()) return { path: abs };
+    const buf = await fsImpl.readFile(realAbs);
     const truncated = buf.subarray(0, HOOK_SCRIPT_MAX_BYTES).toString("utf8");
     return { path: abs, source: truncated };
   } catch {

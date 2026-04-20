@@ -5,10 +5,12 @@ import { PathBinaryDetector } from "./detectors/path-binary.js";
 import { SkillNameDetector } from "./detectors/skill-name.js";
 import { SlashCommandDetector } from "./detectors/slash-command.js";
 import { SubagentTypeDetector } from "./detectors/subagent-type.js";
+import { DETECTOR_TIMEOUT_MS } from "./policies.js";
 import { Report } from "./report.js";
 import type { Collision, SnapshotData } from "./types.js";
 
-export const DEFAULT_DETECTOR_TIMEOUT_MS = 100;
+/** @deprecated use DETECTOR_TIMEOUT_MS from ./policies instead. */
+export const DEFAULT_DETECTOR_TIMEOUT_MS = DETECTOR_TIMEOUT_MS;
 
 export interface ScannerOptions {
   detectors?: Detector[];

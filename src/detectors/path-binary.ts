@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
+import type { Stats } from "node:fs";
 import type { Detector } from "../detector.js";
 import type { Collision, SnapshotData } from "../types.js";
 
@@ -40,6 +41,11 @@ export const BENIGN_SYSTEM_BINARIES: ReadonlySet<string> = new Set([
 export interface PathBinaryDetectorOptions {
   /** Override for tests — supply contents keyed by absolute path. */
   readFile?: (path: string) => Promise<Buffer>;
+  /**
+   * Override for tests. Default `fs.lstat` so symlinks are not followed
+   * before we've decided whether the entry is a plain file.
+   */
+  lstat?: (path: string) => Promise<Stats>;
   /** Override allowlist. Defaults to BENIGN_SYSTEM_BINARIES. */
   allowlist?: ReadonlySet<string>;
 }
@@ -48,10 +54,12 @@ export class PathBinaryDetector implements Detector {
   readonly category = "path-binary" as const;
 
   private readonly readFile: (path: string) => Promise<Buffer>;
+  private readonly lstat: (path: string) => Promise<Stats>;
   private readonly allowlist: ReadonlySet<string>;
 
   constructor(options: PathBinaryDetectorOptions = {}) {
     this.readFile = options.readFile ?? ((p) => fs.readFile(p));
+    this.lstat = options.lstat ?? ((p) => fs.lstat(p));
     this.allowlist = options.allowlist ?? BENIGN_SYSTEM_BINARIES;
   }
 
@@ -112,6 +120,11 @@ export class PathBinaryDetector implements Detector {
 
   private async safeHash(path: string): Promise<string | null> {
     try {
+      // `lstat` so we don't follow a symlink into a device or FIFO. If the
+      // entry is a symlink to a regular file that is fine — we just refuse
+      // to hash anything that is not already a plain file at this path.
+      const stat = await this.lstat(path);
+      if (!stat.isFile()) return null;
       const buf = await this.readFile(path);
       return createHash("sha256").update(buf).digest("hex");
     } catch {

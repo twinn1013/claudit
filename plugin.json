@@ -1,9 +1,10 @@
 {
   "name": "claudit",
-  "version": "0.0.1",
-  "description": "Scan a Claude Code installation for identifier collisions and config overwrites across plugins, hooks, skills, agents, MCP servers, and settings.",
+  "version": "0.1.0",
+  "description": "Detects configuration conflicts across Claude Code plugins, hooks, commands, MCP servers, and PATH binaries.",
   "author": {
     "name": "2026editor"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "commands": ["./commands/scan.md"]
 }
