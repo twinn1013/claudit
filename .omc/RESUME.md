@@ -1,74 +1,83 @@
-# Session Resume — claudit v0.2 Rebuild
+# Session Resume — claudit v0.2 Rebuild (Phase 2 in-flight)
 
-**Last touched:** 2026-04-20 (session ended mid-autopilot Phase 2)
+**Last touched:** 2026-04-20 ~15:35 GMT+9 (paused mid-autopilot after Stage 7b)
 
-## Current state
+## Where we are
 
-- **v0.1 shipped** — 17 commits on `main` pushed to `origin`. `a39fd23` is the last v0.1 commit.
-- **External triple-review (GPT + Codex + Gemini) exposed 19 issues** v0.1 internal reviewers missed, including a CRITICAL: claudit's flagship scenario (rtk + OMC hook interference in `~/.claude/settings.json`) goes undetected because v0.1 never scans user-level settings.
-- **v0.2 ralplan consensus APPROVED** on iteration 2 (Architect + Critic both). Commit `d829423`.
-- **Primary plan artifact:** `.omc/plans/v0.2/iteration-2/01-planner-revised.md` (711 lines, 12 stages).
-- **Research evidence:** `.omc/research/cc-schema-ground-truth.md` + `.omc/research/v0.2-redesign-plan.md`.
-- **Consensus doc:** `.omc/plans/v0.2/CONSENSUS.md`.
+**8 of 11 coding stages done.** 270/270 tests green. All commits pushed to `origin main`.
 
-## Before Stage 0: resolve 2 open deltas
+| Stage | Token | Commit | Tests after |
+|-------|-------|--------|-------------|
+| 0 | `[v2-types]` | `1338e59` | 114 |
+| 1 | `[v2-snapshot]` | `0c3a75d` | 151 |
+| 2 | `[v2-detector-hook-matcher]` | `10a1a79` | 185 |
+| 3 | `[v2-detector-namespace]` | `bf571b8` | 194 |
+| 4 | `[v2-detector-mcp]` | `cac32eb` | 202 |
+| 5 | `[v2-detector-path-binary]` | `09c2537` | 210 |
+| 6 | `[v2-stage6-skip]` (empty) | `9f3b3ef` | — |
+| 7a | `[v2-report-base64]` | `b313b3b` | 220 |
+| 7b | `[v2-redaction-scanmd]` | `b0ca72d` | 270 |
 
-Post-approval audit found 2 partial closures of external-review findings. See `.omc/plans/v0.2/OPEN-DELTAS.md` — decide patch-or-accept for each before Stage 0 starts.
+**Primary plan:** `.omc/plans/v0.2/iteration-2/01-planner-revised.md` (with post-approval Delta 1 + Delta 2a + Delta 2c folded into Stage 0 + Stage 1 — `OPEN-DELTAS.md` marked CLOSED).
+**Consensus doc:** `.omc/plans/v0.2/CONSENSUS.md`.
+**Ground truth:** `.omc/research/cc-schema-ground-truth.md`.
 
-1. **MCP probe paths** — `~/.claude.json` not in Stage 1 probe list (only `~/.claude/.mcp.json` + `settings.json.mcpServers`).
-2. **Hook scope/type** — `managed` scope missing from HookSource; non-command hook types (`prompt`/`agent`/`http`) not handled.
+## What's left
 
-Both are small patches (~15-20 LOC total) or can be deferred to v0.3 with documentation.
+### Stage 8 `[v2-e2e-flagship]` — NEXT UP
+- Effort M.
+- Goal: end-to-end test proving claudit detects its own flagship scenario (rtk user-settings hook + OMC plugin hook interfering on same PreToolUse `*` matcher, both mutating).
+- Deliverables:
+  - `tests/e2e/rtk-omc-real.test.ts` + `tests/e2e/fixtures/rtk-omc/` directory tree
+  - `tests/e2e/namespace-ambiguity.test.ts` — two plugins with same command name → `info/possible`
+  - `tests/e2e/disabled-plugin.test.ts` — collision involving a disabled plugin → `possible`
+- Exit criteria in plan lines 344-358. Fixture must exercise full Snapshot → Scanner → Report pipeline with real fs (use `tests/snapshot-v2/_helpers.ts` style).
+- Commit: `[v2-e2e-flagship] rtk+OMC detection, namespace semantics, disabled-plugin handling`
 
-## Next step
+### Phase 4 Validation — HARD GUARDRAIL after Stage 8
+- Pre-check: `which codex && which gemini || which omc`. If none available → BLOCKED, no silent skip.
+- Parallel reviewers:
+  - Internal: `architect`, `security-reviewer`, `code-reviewer` (Task tool)
+  - External: `omc ask codex` + `omc ask gemini` (per plan Section 5 prompt templates, lines 543-586)
+- CRITICAL findings block Stage 9+. MAJOR findings: fix if feasible or document in Limitations.
+- Artifact any CCG results to `.omc/artifacts/v0.2-phase4-*.md`.
+- Fallback if CLI unavailable: document manual human review in `.omc/plans/v0.2/manual-review-notes.md` — ABSOLUTELY no silent skip.
 
-Autopilot was invoked, detected the v0.2 consensus, and skipped Phase 0 + Phase 1. It had just entered **Phase 2 (Execution)** and was about to start **Stage 0 `[v2-types]`** when the session was interrupted.
+### Stage 9 `[v2-ralph-verify]` — 6-criterion verification
+- Effort S.
+- `tests/ralph-verify-v2.test.ts` with all 6 criteria: install, namespace, idempotency, multi-source hooks, flagship, v0.1 regression floor 100/109.
+- Exit criteria plan lines 363-372.
 
-### How to resume
+### Stage 10 `[v2-docs-polish]`
+- Effort S.
+- README, CLAUDE.md, JSDoc, `src/policies.ts` redaction + namespace severity constants. Plan lines 377-392.
 
-Option A (recommended — let autopilot drive):
+### Stage 11 `[v2-release]`
+- Effort S.
+- `package.json` → 0.2.0, `marketplace.json` match, clean build, full suite green, manual smoke test.
+- Plan lines 396-411.
 
+## How to resume
+
+**Option A (recommended — continue autopilot):**
 ```
-/oh-my-claudecode:autopilot Resume claudit v0.2 rebuild. Consensus at `.omc/plans/v0.2/CONSENSUS.md` + primary `.omc/plans/v0.2/iteration-2/01-planner-revised.md`. Skip Phase 0+1. Resume Phase 2 at Stage 0 [v2-types]. Phase 4 MUST include CCG (Codex + Gemini via omc ask) — hard guardrail, no silent skip.
+/oh-my-claudecode:autopilot Resume claudit v0.2 rebuild after Stage 7b (commit b0ca72d). Consensus at .omc/plans/v0.2/CONSENSUS.md + primary .omc/plans/v0.2/iteration-2/01-planner-revised.md. Start Phase 2 at Stage 8 [v2-e2e-flagship]. Phase 4 validation MUST include CCG (Codex + Gemini via omc ask) alongside architect + security-reviewer + code-reviewer per plan Section 5 — hard guardrail, pre-check blocks on missing CLI, no silent skip. Stop and escalate if ralph-verify Criterion 6 (v0.1 regression floor 100/109) fails, rtk+OMC flagship E2E (Stage 8) fails, or CCG invocation fails without documented manual human review.
 ```
 
-Option B (manual — go straight to Stage 0):
-- Read `.omc/plans/v0.2/iteration-2/01-planner-revised.md` Stage 0 (lines 132-158).
-- Implement `[v2-types]` changes, run `npm run typecheck && npm test`, commit with the prescribed stage message, push.
-- Then move to Stage 1 `[v2-snapshot]` (Effort: L — the biggest stage).
+**Option B (manual):** Open `.omc/plans/v0.2/iteration-2/01-planner-revised.md` at Stage 8 section, build the rtk+OMC fixture, implement, commit, push. Then Phase 4 pre-check.
 
-## 12-stage pipeline (quick reference)
+## Regression floor
+At least 100 of 109 v0.1 tests must pass without modification. Currently well above — most v0.1 tests are green and the few updates were mechanical field additions or semantics updates (info/possible instead of definite/destructive).
 
-| Stage | Token | Effort | Status |
-|-------|-------|--------|--------|
-| 0 | `[v2-types]` | S | **PENDING — START HERE** |
-| 1 | `[v2-snapshot]` | L | pending |
-| 2 | `[v2-detector-hook-matcher]` | M | pending |
-| 3 | `[v2-detector-namespace]` | M | pending |
-| 4 | `[v2-detector-mcp]` | S | pending |
-| 5 | `[v2-detector-path-binary]` | S | pending |
-| 6 | (reserved) | — | skip |
-| 7a | `[v2-report-base64]` | S | pending |
-| 7b | `[v2-redaction-scanmd]` | M | pending |
-| 8 | `[v2-e2e-flagship]` | M | pending |
-| 9 | `[v2-ralph-verify]` | S | pending |
-| 10 | `[v2-docs-polish]` | S | pending |
-| 11 | `[v2-release]` | S | pending |
+## External-review guardrails
+- Codex + Gemini caught 19 issues internal reviewers missed at v0.1. v0.2 Stages 0-7b closed every one of those via plan exit criteria.
+- Phase 4 CCG is the safety net against introducing NEW blind spots in the rewrite itself. Do not skip.
+- See `.claude/projects/-Users-2026editor-Documents-proj-claudit/memory/feedback_external_review_guardrail.md` for the rule.
 
-## Phase 4 validation — HARD REQUIREMENT
-
-When Stage 8 completes, Phase 4 must include:
-- Internal: `architect` + `security-reviewer` + `code-reviewer` (parallel)
-- External: `omc ask codex` + `omc ask gemini` (parallel)
-
-If external CLI unavailable → Phase 4 BLOCKED. No silent skip. See plan Section 5 (lines 506-602) for pre-check script, prompt templates, and fallback rules.
-
-## Open reminders
-
-- **v0.1 regression floor:** at least 100 of 109 v0.1 tests must pass without modification after the rewrite. Failing tests documented (not deleted) in `tests/v0.1-migration-notes.md`.
-- **Stage 0 breaking change:** `PluginAgent.type → name` — global find-replace will break a couple of existing detector tests; update them in the same commit.
-- **Working tree at pause:** clean except untracked `.omc/artifacts/` (CCG review logs), `.omc/project-memory.json`, `AGENTS.md`. Nothing blocking a fresh resume.
+## Working tree at pause
+- Clean working tree (all Stage 7b changes committed).
+- Untracked: `.omc/artifacts/` (CCG review logs from earlier sessions), `.omc/project-memory.json`, `AGENTS.md`, possibly `tests/v0.1-migration-notes.md` if created earlier.
+- Nothing blocks a fresh resume.
 
 ## Kill switch
-
-To abort entirely and archive v0.2 work without executing: keep the plan commits (they document the research), delete `.omc/autopilot/` state files, and run `/oh-my-claudecode:cancel --force`.
+Cancel autopilot: `/oh-my-claudecode:cancel --force`. To abandon v0.2 entirely: keep all `[v2-*]` commits as documentation, revert `package.json` version bump if it already happened (it hasn't — Stage 11), and archive the plan.
