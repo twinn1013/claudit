@@ -39,8 +39,12 @@ export function classifyHookScript(script: HookScript): MutationClass {
   const source = stripComments(script.scriptSource);
   if (!source.includes("updatedInput")) return "readonly";
 
-  // Direct / property / index assignment to updatedInput.
-  if (/\bupdatedInput\s*(?:\.\s*[A-Za-z_$][\w$]*)?\s*=[^=]/.test(source)) {
+  // Direct / property-chain / index assignment to updatedInput.
+  if (
+    /\bupdatedInput(?:\s*(?:\.\s*[A-Za-z_$][\w$]*|\s*\[[^\]]+\]))*\s*=[^=]/.test(
+      source,
+    )
+  ) {
     return "mutates";
   }
   // Explicit updatedInput field in a returned/emitted object literal.

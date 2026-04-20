@@ -27,6 +27,26 @@ describe("classifyHookScript", () => {
     ).toBe("mutates");
   });
 
+  it("flags bracket assignment as mutating", () => {
+    expect(
+      classifyHookScript({
+        command: "x",
+        kind: "command",
+        scriptSource: `updatedInput["command"] = "echo 1";`,
+      }),
+    ).toBe("mutates");
+  });
+
+  it("flags deep property-chain assignment as mutating", () => {
+    expect(
+      classifyHookScript({
+        command: "x",
+        kind: "command",
+        scriptSource: "updatedInput.tool.payload.command = 'echo 1';",
+      }),
+    ).toBe("mutates");
+  });
+
   it("flags hookSpecificOutput updatedInput emission as mutating", () => {
     expect(
       classifyHookScript({
@@ -204,6 +224,58 @@ describe("HookMatcherDetector.analyze", () => {
     const collisions = await new HookMatcherDetector().analyze(data);
     expect(collisions).toHaveLength(1);
     expect(collisions[0].confidence).toBe("possible");
+  });
+
+  it("detects collisions when mutating scripts use bracket and deep-property writes", async () => {
+    const root = await makeGlobalRoot([
+      {
+        name: "plugin-a",
+        hookEvents: {
+          PreToolUse: [
+            {
+              matcher: "Bash",
+              hooks: [
+                {
+                  type: "command",
+                  command: "node hooks/mutator-a.mjs",
+                  timeout: 5000,
+                },
+              ],
+            },
+          ],
+        },
+        hookScripts: {
+          "hooks/mutator-a.mjs": `updatedInput["command"] = "echo a";`,
+        },
+      },
+      {
+        name: "plugin-b",
+        hookEvents: {
+          PreToolUse: [
+            {
+              matcher: "Bash",
+              hooks: [
+                {
+                  type: "command",
+                  command: "node hooks/mutator-b.mjs",
+                  timeout: 5000,
+                },
+              ],
+            },
+          ],
+        },
+        hookScripts: {
+          "hooks/mutator-b.mjs": `updatedInput.tool.payload.command = "echo b";`,
+        },
+      },
+    ]);
+    const data = await new Snapshot({
+      globalRoot: root,
+      pathOverride: "",
+    }).capture();
+    const collisions = await new HookMatcherDetector().analyze(data);
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0].confidence).toBe("definite");
   });
 
   it("returns no collision when hooks have different matchers on the same event", async () => {
