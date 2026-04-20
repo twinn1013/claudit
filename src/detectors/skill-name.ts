@@ -1,5 +1,11 @@
 import type { Detector } from "../detector.js";
 import { pluginOrigin } from "../plugin-identity.js";
+import {
+  NAMESPACE_AMBIGUITY_CONFIDENCE,
+  NAMESPACE_AMBIGUITY_SEVERITY,
+  NAMESPACE_TRIGGER_OVERLAP_CONFIDENCE,
+  NAMESPACE_TRIGGER_OVERLAP_SEVERITY,
+} from "../policies.js";
 import type { Collision, SnapshotData } from "../types.js";
 import { formatDisambiguationMessage } from "./namespace-util.js";
 
@@ -65,8 +71,8 @@ export class SkillNameDetector implements Detector {
 
       collisions.push({
         category: "skill-name",
-        severity: "info",
-        confidence: "possible",
+        severity: NAMESPACE_AMBIGUITY_SEVERITY,
+        confidence: NAMESPACE_AMBIGUITY_CONFIDENCE,
         entities_involved: plugins.map((p) => `${p.name}:skill:${name}`),
         suggested_fix: [],
         message: formatDisambiguationMessage("skill", name, plugins),
@@ -82,8 +88,8 @@ export class SkillNameDetector implements Detector {
       if (distinctSkills.size < 2) continue;
       collisions.push({
         category: "skill-name",
-        severity: "info",
-        confidence: "possible",
+        severity: NAMESPACE_TRIGGER_OVERLAP_SEVERITY,
+        confidence: NAMESPACE_TRIGGER_OVERLAP_CONFIDENCE,
         entities_involved: entries.map(
           (e) => `${e.plugin}:skill:${e.skill}:trigger:${keyword}`,
         ),

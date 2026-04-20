@@ -1,5 +1,9 @@
 import type { Detector } from "../detector.js";
 import { pluginOrigin } from "../plugin-identity.js";
+import {
+  NAMESPACE_AMBIGUITY_CONFIDENCE,
+  NAMESPACE_AMBIGUITY_SEVERITY,
+} from "../policies.js";
 import type { Collision, SnapshotData } from "../types.js";
 import { formatDisambiguationMessage } from "./namespace-util.js";
 
@@ -50,8 +54,8 @@ export class SubagentTypeDetector implements Detector {
 
       collisions.push({
         category: "subagent-type",
-        severity: "info",
-        confidence: "possible",
+        severity: NAMESPACE_AMBIGUITY_SEVERITY,
+        confidence: NAMESPACE_AMBIGUITY_CONFIDENCE,
         entities_involved: plugins.map((p) => `${p.name}:agent:${name}`),
         suggested_fix: [],
         message: formatDisambiguationMessage("agent", name, plugins),

@@ -5,6 +5,7 @@
  */
 
 import type { Confidence, Severity } from "./types.js";
+import { DEFAULT_REDACTOR_PATTERNS } from "./redactor.js";
 
 /** Per-detector wall-clock budget enforced by the Scanner. */
 export const DETECTOR_TIMEOUT_MS = 100;
@@ -95,6 +96,20 @@ export const CONFIDENCE_ORDER: readonly Confidence[] = [
   "possible",
   "unknown",
 ];
+
+/** Namespace ambiguities are warnings to the user, not destructive conflicts. */
+export const NAMESPACE_AMBIGUITY_SEVERITY: Severity = "info";
+export const NAMESPACE_AMBIGUITY_CONFIDENCE: Confidence = "possible";
+
+/** Trigger-keyword overlap is runtime-dependent and therefore stays informational. */
+export const NAMESPACE_TRIGGER_OVERLAP_SEVERITY: Severity = "info";
+export const NAMESPACE_TRIGGER_OVERLAP_CONFIDENCE: Confidence = "possible";
+
+/** Shared summary of the built-in secret redaction policy surface. */
+export const REDACTION_PATTERN_NAMES = DEFAULT_REDACTOR_PATTERNS.patterns.map(
+  (pattern) => pattern.name,
+);
+export const REDACTION_PATTERN_COUNT = REDACTION_PATTERN_NAMES.length;
 
 // Re-export redaction constants so consumers have a single import source
 // for all policy-level configuration.
