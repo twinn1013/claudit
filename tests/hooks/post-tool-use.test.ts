@@ -61,6 +61,28 @@ describe("PostToolUse hook", () => {
     );
   });
 
+  it("redacts secrets in additionalContext with the same pending-marker pass", async () => {
+    const stdin = JSON.stringify({
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_input: {
+        command: `GITHUB_TOKEN=ghp_secret123 brew install foo`,
+      },
+    });
+    await postToolUse({ stdin, pendingDir });
+    const markers = await listPendingMarkers({ dir: pendingDir });
+    expect(markers).toHaveLength(1);
+
+    const out = parseOutput(cap) as {
+      continue: boolean;
+      hookSpecificOutput?: { additionalContext?: string };
+    };
+    const context = out.hookSpecificOutput?.additionalContext ?? "";
+    expect(context).toContain("GITHUB_TOKEN=<redacted> brew install foo");
+    expect(context).not.toContain("ghp_secret123");
+    expect(context).toContain(markers[0].command);
+  });
+
   it("does nothing for a non-install Bash command and exits under 10ms", async () => {
     const stdin = JSON.stringify({
       hook_event_name: "PostToolUse",

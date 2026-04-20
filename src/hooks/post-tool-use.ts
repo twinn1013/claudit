@@ -6,6 +6,7 @@ import {
 } from "../hook-io.js";
 import {
   matchInstallPattern,
+  redactPendingCommand,
   writePendingMarker,
 } from "../pending.js";
 
@@ -45,6 +46,7 @@ export async function main(
   }
 
   const timestamp = (args.now ?? (() => new Date().toISOString()))();
+  const redactedCommand = redactPendingCommand(parsed.command);
   try {
     await writePendingMarker({
       dir: args.pendingDir,
@@ -62,7 +64,7 @@ export async function main(
   writeHookOutput(
     buildHookOutput({
       hookEventName: HOOK_EVENT_NAME,
-      additionalContext: `<claudit-pending>install detected: ${parsed.command}</claudit-pending>`,
+      additionalContext: `<claudit-pending>install detected: ${redactedCommand}</claudit-pending>`,
     }),
   );
 }

@@ -24,6 +24,10 @@ export interface WritePendingMarkerOptions {
   hashSuffix?: string;
 }
 
+export function redactPendingCommand(command: string): string {
+  return redactCommand(command);
+}
+
 /**
  * Write a pending marker atomically: payload lands in a .tmp file first, then
  * renamed into place. This prevents SessionStart from reading a half-written
@@ -45,7 +49,7 @@ export async function writePendingMarker(
   const tmp = `${target}.tmp`;
   const redacted: PendingMarker = {
     ...options.marker,
-    command: redactCommand(options.marker.command),
+    command: redactPendingCommand(options.marker.command),
   };
   await fsImpl.writeFile(tmp, JSON.stringify(redacted), "utf8");
   await fsImpl.rename(tmp, target);
