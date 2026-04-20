@@ -55,7 +55,7 @@ export const DEFAULT_REDACTOR_PATTERNS: RedactorPatterns = {
       // Negative:  NODE_ENV=production  — suffix "ENV" not in list, unchanged.
       name: "env-var-secret",
       regex:
-        /\b([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|AUTH))=\S+/g,
+        /\b([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|AUTH))=(?:"[^"]*"|'[^']*'|\S+)/g,
       replacement: "$1=<redacted>",
     },
     {
@@ -65,7 +65,7 @@ export const DEFAULT_REDACTOR_PATTERNS: RedactorPatterns = {
       // Negative:  cli --verbose                  — unchanged.
       name: "cli-flag-secret",
       regex:
-        /(--(?:password|passwd|auth[_-]?token|api[_-]?key|secret)[=\s]+)(?:"[^"]*"|'[^']*'|\S+)/gi,
+        /(--(?:password|passwd|token|auth[_-]?token|access[_-]?token|api[_-]?key|secret)[=\s]+)(?:"[^"]*"|'[^']*'|\S+)/gi,
       replacement: "$1<redacted>",
     },
     {

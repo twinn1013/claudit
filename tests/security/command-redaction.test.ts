@@ -90,6 +90,20 @@ describe("Pattern 3 — env-var secret assignments", () => {
     expect(out).toContain("DB_PASSWORD=<redacted>");
   });
 
+  it('positive: GITHUB_TOKEN="abc 123" is fully redacted', () => {
+    const cmd = `GITHUB_TOKEN="abc 123" brew install foo`;
+    const out = redactCommand(cmd);
+    expect(out).toContain(`GITHUB_TOKEN=<redacted> brew install foo`);
+    expect(out).not.toContain(`abc 123`);
+  });
+
+  it("positive: API_KEY='sk-xxx' is redacted", () => {
+    const cmd = `API_KEY='sk-xxx' npm run build`;
+    const out = redactCommand(cmd);
+    expect(out).toContain("API_KEY=<redacted> npm run build");
+    expect(out).not.toContain("sk-xxx");
+  });
+
   it("negative: NODE_ENV=production is NOT redacted", () => {
     const cmd = `NODE_ENV=production npm start`;
     expect(redactCommand(cmd)).toBe(cmd);
@@ -122,6 +136,13 @@ describe("Pattern 4 — CLI flag secret values", () => {
     const cmd = `tool --auth-token abc123def456`;
     const out = redactCommand(cmd);
     expect(out).toContain("--auth-token <redacted>");
+  });
+
+  it('positive: --token="bearer xxx" is redacted', () => {
+    const cmd = `tool --token="bearer xxx" --verbose`;
+    const out = redactCommand(cmd);
+    expect(out).toContain("--token=<redacted> --verbose");
+    expect(out).not.toContain("bearer xxx");
   });
 
   it("negative: --verbose is NOT redacted", () => {

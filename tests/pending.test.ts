@@ -136,6 +136,23 @@ describe("writePendingMarker / listPendingMarkers / deletePendingMarker", () => 
     expect(list[0].command).not.toContain("abc123");
   });
 
+  it("fully redacts quoted env-var secrets before writing to disk", async () => {
+    const dir = await makeTempDir("redact-quoted-");
+    await writePendingMarker({
+      dir,
+      marker: {
+        timestamp: "2026-04-20T12:00:00.000Z",
+        trigger: "PostToolUse",
+        command: `GITHUB_TOKEN="abc 123" brew install foo`,
+        matched_pattern: "brew install\\s+\\S",
+      },
+    });
+    const list = await listPendingMarkers({ dir });
+    expect(list).toHaveLength(1);
+    expect(list[0].command).toBe("GITHUB_TOKEN=<redacted> brew install foo");
+    expect(list[0].command).not.toContain("abc 123");
+  });
+
   it("redaction is a no-op for commands without secret patterns", async () => {
     const dir = await makeTempDir("redact-noop-");
     await writePendingMarker({
