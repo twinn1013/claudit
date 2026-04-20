@@ -11,6 +11,15 @@
 - **Research evidence:** `.omc/research/cc-schema-ground-truth.md` + `.omc/research/v0.2-redesign-plan.md`.
 - **Consensus doc:** `.omc/plans/v0.2/CONSENSUS.md`.
 
+## Before Stage 0: resolve 2 open deltas
+
+Post-approval audit found 2 partial closures of external-review findings. See `.omc/plans/v0.2/OPEN-DELTAS.md` — decide patch-or-accept for each before Stage 0 starts.
+
+1. **MCP probe paths** — `~/.claude.json` not in Stage 1 probe list (only `~/.claude/.mcp.json` + `settings.json.mcpServers`).
+2. **Hook scope/type** — `managed` scope missing from HookSource; non-command hook types (`prompt`/`agent`/`http`) not handled.
+
+Both are small patches (~15-20 LOC total) or can be deferred to v0.3 with documentation.
+
 ## Next step
 
 Autopilot was invoked, detected the v0.2 consensus, and skipped Phase 0 + Phase 1. It had just entered **Phase 2 (Execution)** and was about to start **Stage 0 `[v2-types]`** when the session was interrupted.
