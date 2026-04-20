@@ -161,6 +161,11 @@ function buildCollision(
     confidence = "possible";
     explanation =
       "One hook mutates updatedInput while a co-registered hook could not be statically analysed; mutual interference cannot be ruled out.";
+  } else if (mutates.length === 0 && unknowns.length >= 2) {
+    confidence = "unknown";
+    severity = "info";
+    explanation =
+      "Multiple co-registered hooks overlap on the same event+matcher, but none could be statically analysed for updatedInput mutation.";
   }
   if (!confidence) return null;
 

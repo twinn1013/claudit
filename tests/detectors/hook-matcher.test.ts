@@ -226,6 +226,53 @@ describe("HookMatcherDetector.analyze", () => {
     expect(collisions[0].confidence).toBe("possible");
   });
 
+  it("returns unknown/info when two overlapping hooks are both unresolved", async () => {
+    const root = await makeGlobalRoot([
+      {
+        name: "plugin-a",
+        hookEvents: {
+          PreToolUse: [
+            {
+              matcher: "Bash",
+              hooks: [
+                {
+                  type: "command",
+                  command: "external-a --watch",
+                  timeout: 5000,
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        name: "plugin-b",
+        hookEvents: {
+          PreToolUse: [
+            {
+              matcher: "Bash",
+              hooks: [
+                {
+                  type: "command",
+                  command: "external-b --watch",
+                  timeout: 5000,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+    const data = await new Snapshot({
+      globalRoot: root,
+      pathOverride: "",
+    }).capture();
+    const collisions = await new HookMatcherDetector().analyze(data);
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0].confidence).toBe("unknown");
+    expect(collisions[0].severity).toBe("info");
+  });
+
   it("detects collisions when mutating scripts use bracket and deep-property writes", async () => {
     const root = await makeGlobalRoot([
       {

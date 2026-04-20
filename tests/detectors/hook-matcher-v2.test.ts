@@ -417,4 +417,40 @@ describe("Delta 2c — non-command HookScript.kind treated as unknown", () => {
     // 1 mutates + 1 unknown → possible
     expect(collisions[0].confidence).toBe("possible");
   });
+
+  it("two overlapping unknown hooks → unknown/info collision", async () => {
+    const snap = emptySnapshot({
+      settingsHooks: [
+        {
+          event: "PreToolUse",
+          matcher: "*",
+          source: "user-settings",
+          hooks: [
+            {
+              command: "",
+              kind: "prompt",
+              rawConfig: { type: "prompt", prompt: "Review this edit." },
+            },
+          ],
+        },
+        {
+          event: "PreToolUse",
+          matcher: "Bash",
+          source: "project-settings",
+          hooks: [
+            {
+              command: "",
+              kind: "agent",
+              rawConfig: { type: "agent", name: "reviewer" },
+            },
+          ],
+        },
+      ],
+    });
+
+    const collisions = await new HookMatcherDetector().analyze(snap);
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0].confidence).toBe("unknown");
+    expect(collisions[0].severity).toBe("info");
+  });
 });
