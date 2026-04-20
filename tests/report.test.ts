@@ -51,7 +51,7 @@ describe("Report.fromCollisions", () => {
 });
 
 describe("Report.serialize / parse", () => {
-  it("produces a <claudit-report> XML wrapper around valid JSON", () => {
+  it("produces a <claudit-report> wrapper around base64-encoded JSON", () => {
     const report = Report.fromCollisions([fixtureCollision], {
       detector_count: 6,
     });
@@ -62,7 +62,10 @@ describe("Report.serialize / parse", () => {
       "<claudit-report>".length,
       wrapped.length - "</claudit-report>".length,
     );
-    expect(() => JSON.parse(inner)).not.toThrow();
+    // inner must be pure base64 — no raw JSON characters
+    expect(inner).toMatch(/^[A-Za-z0-9+/=]+$/);
+    // decoding it must yield valid JSON
+    expect(() => JSON.parse(Buffer.from(inner, "base64").toString("utf8"))).not.toThrow();
   });
 
   it("round-trips through parse with lossless fidelity", () => {

@@ -14,7 +14,9 @@ Execute the compiled scanner CLI via the Bash tool:
 node "$CLAUDE_PLUGIN_ROOT/dist/commands/scan.mjs"
 ```
 
-The command prints a single line wrapped in `<claudit-report>...</claudit-report>` tags containing a JSON payload of this shape:
+The command prints a single line wrapped in `<claudit-report>...</claudit-report>` tags. The content between the tags is a **base64-encoded JSON payload** — decode it with `Buffer.from(content, "base64").toString("utf8")` (Node.js) or `atob(content)` (browser/Deno) before parsing as JSON.
+
+The decoded JSON payload has this shape:
 
 ```json
 {

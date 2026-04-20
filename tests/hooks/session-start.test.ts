@@ -5,6 +5,7 @@ import { main as sessionStart } from "../../src/hooks/session-start.js";
 import { Scanner } from "../../src/scanner.js";
 import { Snapshot } from "../../src/snapshot.js";
 import { writePendingMarker, listPendingMarkers } from "../../src/pending.js";
+import { Report } from "../../src/report.js";
 import { makeGlobalRoot, makeTempDir } from "../helpers/fixtures.js";
 
 interface StdoutCapture {
@@ -73,7 +74,8 @@ describe("SessionStart hook", () => {
     expect(out.hookSpecificOutput?.additionalContext).toContain(
       "<claudit-report>",
     );
-    expect(out.hookSpecificOutput?.additionalContext).toContain("slash-command");
+    const parsedReport = Report.parse(out.hookSpecificOutput!.additionalContext!);
+    expect(parsedReport.collisions.some((c) => c.category === "slash-command")).toBe(true);
     const remaining = await listPendingMarkers({ dir: pendingDir });
     expect(remaining).toEqual([]);
   });
