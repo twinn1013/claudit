@@ -13,5 +13,9 @@ import type { Collision, CollisionCategory, SnapshotData } from "./types.js";
  */
 export interface Detector {
   readonly category: CollisionCategory;
-  analyze(current: SnapshotData, previous?: SnapshotData): Promise<Collision[]>;
+  analyze(
+    current: SnapshotData,
+    previous?: SnapshotData,
+    signal?: AbortSignal,
+  ): Promise<Collision[]>;
 }
