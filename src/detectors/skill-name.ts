@@ -1,9 +1,14 @@
 import type { Detector } from "../detector.js";
 import type { Collision, SnapshotData } from "../types.js";
+import { formatDisambiguationMessage } from "./namespace-util.js";
 
 /**
- * Detects duplicate skill names across plugins (definite) and overlapping
- * trigger keywords (possible — activation precedence is runtime-dependent).
+ * Detects duplicate skill names across plugins and overlapping trigger
+ * keywords (possible — activation precedence is runtime-dependent).
+ *
+ * v0.2: same base name across plugins = info/possible per namespace-aware
+ * semantics. CC disambiguates via `plugin:name`, so nothing is broken —
+ * but unqualified skill name invocations are ambiguous.
  */
 export class SkillNameDetector implements Detector {
   readonly category = "skill-name" as const;
@@ -11,13 +16,13 @@ export class SkillNameDetector implements Detector {
   async analyze(current: SnapshotData): Promise<Collision[]> {
     const collisions: Collision[] = [];
 
-    const nameIndex = new Map<string, string[]>();
+    const nameIndex = new Map<string, Array<{ plugin: string; enabled: boolean }>>();
     const keywordIndex = new Map<string, Array<{ plugin: string; skill: string }>>();
     for (const plugin of current.plugins) {
       for (const skill of plugin.skills) {
-        const pluginsForName = nameIndex.get(skill.name) ?? [];
-        pluginsForName.push(plugin.name);
-        nameIndex.set(skill.name, pluginsForName);
+        const entries = nameIndex.get(skill.name) ?? [];
+        entries.push({ plugin: plugin.name, enabled: plugin.enabled });
+        nameIndex.set(skill.name, entries);
         for (const kw of skill.triggerKeywords) {
           const normalized = kw.toLowerCase().trim();
           if (!normalized) continue;
@@ -28,26 +33,30 @@ export class SkillNameDetector implements Detector {
       }
     }
 
-    for (const [name, plugins] of nameIndex) {
-      const unique = [...new Set(plugins)].sort();
-      if (unique.length < 2) continue;
+    // Skill name collisions: info/possible with disambiguation guidance.
+    for (const [name, entries] of nameIndex) {
+      // Dedupe by plugin name, keeping enabled=false if any entry for that plugin is disabled.
+      const pluginMap = new Map<string, boolean>();
+      for (const e of entries) {
+        pluginMap.set(e.plugin, (pluginMap.get(e.plugin) ?? true) && e.enabled);
+      }
+      if (pluginMap.size < 2) continue;
+
+      const plugins = [...pluginMap.entries()]
+        .map(([n, en]) => ({ name: n, enabled: en }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
       collisions.push({
         category: "skill-name",
-        severity: "warning",
-        confidence: "definite",
-        entities_involved: unique.map((p) => `${p}:skill:${name}`),
-        suggested_fix: [
-          {
-            command: `# rename the skill inside one of: ${unique.join(", ")}`,
-            scope: "plugin",
-            safety_level: "manual-review",
-            rationale: `Skill name "${name}" is defined by ${unique.length} plugins; trigger resolution becomes order-dependent.`,
-          },
-        ],
-        message: `${unique.length} plugins define a skill named "${name}": ${unique.join(", ")}.`,
+        severity: "info",
+        confidence: "possible",
+        entities_involved: plugins.map((p) => `${p.name}:skill:${name}`),
+        suggested_fix: [],
+        message: formatDisambiguationMessage("skill", name, plugins),
       });
     }
 
+    // Trigger keyword overlap: keep info/possible, no # comment fix suggestions.
     for (const [keyword, holders] of keywordIndex) {
       const uniquePairs = new Map<string, { plugin: string; skill: string }>();
       for (const h of holders) uniquePairs.set(`${h.plugin}::${h.skill}`, h);
@@ -61,15 +70,8 @@ export class SkillNameDetector implements Detector {
         entities_involved: entries.map(
           (e) => `${e.plugin}:skill:${e.skill}:trigger:${keyword}`,
         ),
-        suggested_fix: [
-          {
-            command: `# refine trigger keywords to avoid "${keyword}" in one of the skills`,
-            scope: "plugin",
-            safety_level: "manual-review",
-            rationale: `Trigger keyword "${keyword}" is shared by multiple skills; activation precedence is runtime-dependent and may surprise users.`,
-          },
-        ],
-        message: `Trigger keyword "${keyword}" is shared by ${distinctSkills.size} skills: ${[...distinctSkills].join(", ")}.`,
+        suggested_fix: [],
+        message: `Trigger keyword "${keyword}" is shared by ${distinctSkills.size} skills: ${[...distinctSkills].join(", ")}. Activation precedence is runtime-dependent and may surprise users.`,
       });
     }
 

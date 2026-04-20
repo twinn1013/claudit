@@ -1,3 +1,4 @@
+// v0.2: same base name across plugins = info/possible per namespace-aware semantics; was definite/warning in v0.1.
 import { describe, expect, it } from "vitest";
 import { SkillNameDetector } from "../../src/detectors/skill-name.js";
 import { Snapshot } from "../../src/snapshot.js";
@@ -9,18 +10,31 @@ async function snap(plugins: Parameters<typeof makeGlobalRoot>[0]) {
 }
 
 describe("SkillNameDetector", () => {
-  it("produces a definite collision when two plugins both define the same skill name", async () => {
+  it("produces an info/possible collision when two plugins both define the same skill name", async () => {
     const data = await snap([
       { name: "plugin-a", skills: [{ name: "deploy" }] },
       { name: "plugin-b", skills: [{ name: "deploy" }] },
     ]);
     const collisions = await new SkillNameDetector().analyze(data);
-    const definite = collisions.filter((c) => c.confidence === "definite");
-    expect(definite).toHaveLength(1);
-    expect(definite[0].entities_involved.sort()).toEqual([
+    const nameCols = collisions.filter((c) => c.confidence === "possible" && !c.entities_involved[0].includes(":trigger:"));
+    expect(nameCols).toHaveLength(1);
+    expect(nameCols[0].severity).toBe("info");
+    expect(nameCols[0].confidence).toBe("possible");
+    expect(nameCols[0].entities_involved.sort()).toEqual([
       "plugin-a:skill:deploy",
       "plugin-b:skill:deploy",
     ]);
+    // Disambiguation message present.
+    expect(nameCols[0].message).toContain("plugin-a:deploy");
+    expect(nameCols[0].message).toContain("plugin-b:deploy");
+    // No destructive fix suggestions.
+    expect(
+      nameCols[0].suggested_fix.some((f) => f.safety_level === "destructive"),
+    ).toBe(false);
+    // No # comment pseudo-commands.
+    expect(
+      nameCols[0].suggested_fix.some((f) => f.command.includes("#")),
+    ).toBe(false);
   });
 
   it("produces a possible collision when trigger keywords overlap across distinct skills", async () => {
@@ -43,6 +57,10 @@ describe("SkillNameDetector", () => {
         "plugin-b:skill:cut:trigger:release",
       ]),
     );
+    // Trigger overlap: no # comment fix suggestions.
+    expect(
+      possible[0].suggested_fix.some((f) => f.command.includes("#")),
+    ).toBe(false);
   });
 
   it("produces no collision when skill names and triggers are all unique", async () => {

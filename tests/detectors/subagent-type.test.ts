@@ -1,3 +1,4 @@
+// v0.2: same base name across plugins = info/possible per namespace-aware semantics; was definite/warning in v0.1.
 import { describe, expect, it } from "vitest";
 import { SubagentTypeDetector } from "../../src/detectors/subagent-type.js";
 import { Snapshot } from "../../src/snapshot.js";
@@ -9,19 +10,31 @@ async function snap(plugins: Parameters<typeof makeGlobalRoot>[0]) {
 }
 
 describe("SubagentTypeDetector", () => {
-  it("produces a definite collision when two plugins define agent type 'researcher'", async () => {
+  it("produces an info/possible collision when two plugins define agent 'researcher'", async () => {
     const data = await snap([
       { name: "plugin-a", agents: ["researcher"] },
       { name: "plugin-b", agents: ["researcher"] },
     ]);
     const collisions = await new SubagentTypeDetector().analyze(data);
     expect(collisions).toHaveLength(1);
-    expect(collisions[0].confidence).toBe("definite");
+    expect(collisions[0].severity).toBe("info");
+    expect(collisions[0].confidence).toBe("possible");
     expect(collisions[0].category).toBe("subagent-type");
     expect(collisions[0].entities_involved.sort()).toEqual([
       "plugin-a:agent:researcher",
       "plugin-b:agent:researcher",
     ]);
+    // Disambiguation message.
+    expect(collisions[0].message).toContain("plugin-a:researcher");
+    expect(collisions[0].message).toContain("plugin-b:researcher");
+    // No destructive fix suggestions.
+    expect(
+      collisions[0].suggested_fix.some((f) => f.safety_level === "destructive"),
+    ).toBe(false);
+    // No # comment pseudo-commands.
+    expect(
+      collisions[0].suggested_fix.some((f) => f.command.includes("#")),
+    ).toBe(false);
   });
 
   it("produces no collision when subagent types are unique", async () => {

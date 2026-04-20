@@ -5,10 +5,12 @@ import { makeGlobalRoot } from "../helpers/fixtures.js";
 
 /**
  * E2E scenario: two plugins register /scan independently. The full pipeline
- * must produce a definite slash-command collision listing both plugins.
+ * must produce an info/possible slash-command collision listing both plugins.
+ *
+ * v0.2: namespace-aware semantics — same base name = info/possible (was definite/warning in v0.1).
  */
 describe("E2E: duplicate /scan command across two plugins", () => {
-  it("surfaces a definite slash-command Collision via the full Scanner pipeline", async () => {
+  it("surfaces an info/possible slash-command Collision via the full Scanner pipeline", async () => {
     const globalRoot = await makeGlobalRoot([
       { name: "claudit", commands: ["scan.md", "status.md"] },
       { name: "other-audit", commands: ["scan.md"] },
@@ -22,7 +24,8 @@ describe("E2E: duplicate /scan command across two plugins", () => {
       (c) => c.category === "slash-command",
     );
     expect(collisions).toHaveLength(1);
-    expect(collisions[0].confidence).toBe("definite");
+    expect(collisions[0].severity).toBe("info");
+    expect(collisions[0].confidence).toBe("possible");
     expect(collisions[0].entities_involved.sort()).toEqual([
       "claudit:/scan",
       "other-audit:/scan",
