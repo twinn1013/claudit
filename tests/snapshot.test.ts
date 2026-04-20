@@ -53,7 +53,7 @@ describe("Snapshot.capture", () => {
     );
     expect(p.skills.map((s) => s.name)).toEqual(["skill-a"]);
     expect(p.skills[0].triggerKeywords).toEqual(["foo", "bar"]);
-    expect(p.agents.map((a) => a.type)).toEqual(["agent-a"]);
+    expect(p.agents.map((a) => a.name)).toEqual(["agent-a"]);
     expect(p.mcpServers.map((m) => m.name)).toEqual(["github"]);
 
     expect(data.settingsMcpServers.map((m) => m.name)).toEqual(["linear"]);

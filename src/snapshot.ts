@@ -100,6 +100,7 @@ export class Snapshot {
       projectRoot,
       plugins,
       settingsMcpServers,
+      settingsHooks: [],
       pathBinaries,
       capturedAt,
     };
@@ -135,6 +136,7 @@ export class Snapshot {
       typeof (parsed as SnapshotData).capturedAt !== "string" ||
       !Array.isArray((parsed as SnapshotData).plugins) ||
       !Array.isArray((parsed as SnapshotData).settingsMcpServers) ||
+      !Array.isArray((parsed as SnapshotData).settingsHooks) ||
       typeof (parsed as SnapshotData).pathBinaries !== "object"
     ) {
       throw new Error(`Snapshot.load: ${path} is not a valid snapshot file`);
@@ -295,7 +297,7 @@ export class Snapshot {
     const skills = await captureSkills(pluginRoot, this.fs);
     const agents = await captureAgents(pluginRoot, this.fs);
     const mcpServers = extractPluginMcpServers(pluginJson);
-    return { name, pluginRoot, commands, hookEvents, skills, agents, mcpServers };
+    return { name, pluginRoot, commands, hookEvents, skills, agents, mcpServers, source: "plugin-cache" as const, enabled: true };
   }
 
   private async captureSettingsMcpServers(
@@ -409,11 +411,12 @@ async function captureHookEvents(
           );
           hookList.push({
             command: h.command,
+            kind: "command" as const,
             scriptPath: resolved.path,
             scriptSource: resolved.source,
           });
         }
-        registrations.push({ matcher: entry.matcher, hooks: hookList });
+        registrations.push({ matcher: entry.matcher, hooks: hookList, source: "plugin-cache" as const });
       }
       out[event] = registrations;
     }
@@ -498,10 +501,10 @@ async function captureAgents(
   for (const entry of entries) {
     if (!entry.endsWith(".md")) continue;
     const parsed = await parseMdFrontmatter(join(agentsDir, entry), fsImpl);
-    const type =
+    const name =
       (parsed && typeof parsed.name === "string" && parsed.name) ||
       entry.replace(/\.md$/, "");
-    out.push({ type });
+    out.push({ name });
   }
   return out;
 }

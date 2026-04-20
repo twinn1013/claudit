@@ -13,9 +13,9 @@ export class SubagentTypeDetector implements Detector {
     const byType = new Map<string, string[]>();
     for (const plugin of current.plugins) {
       for (const agent of plugin.agents) {
-        const holders = byType.get(agent.type) ?? [];
+        const holders = byType.get(agent.name) ?? [];
         holders.push(plugin.name);
-        byType.set(agent.type, holders);
+        byType.set(agent.name, holders);
       }
     }
 

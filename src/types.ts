@@ -87,16 +87,43 @@ export interface HookOutput {
 
 // ----- Snapshot data contract ---------------------------------------------
 
+/**
+ * The 7 canonical sources from which a hook registration can originate.
+ * Used as a discriminator on HookRegistration and PluginSummary so that
+ * Stage 1+ can route/filter registrations by provenance.
+ */
+export const HOOK_SOURCES = [
+  "plugin-cache",
+  "plugin-marketplace",
+  "user-settings",
+  "user-settings-local",
+  "project-settings",
+  "project-settings-local",
+  "user-managed",
+] as const;
+
+export type HookSource = (typeof HOOK_SOURCES)[number];
+
 export interface HookScript {
   command: string;
+  kind: "command" | "prompt" | "agent" | "http" | "unknown";
   scriptPath?: string;
   scriptSource?: string;   // first 4KB of the resolved script source
   mutatesUpdatedInput?: "yes" | "no" | "unknown";
+  rawConfig?: unknown;
 }
 
 export interface HookRegistration {
   matcher?: string;
   hooks: HookScript[];
+  source: HookSource;
+}
+
+export interface SettingsHookEntry {
+  event: string;
+  matcher?: string;
+  hooks: HookScript[];
+  source: HookSource;
 }
 
 export interface PluginCommand {
@@ -110,7 +137,7 @@ export interface PluginSkill {
 }
 
 export interface PluginAgent {
-  type: string;
+  name: string;
 }
 
 export interface McpServer {
@@ -127,6 +154,8 @@ export interface PluginSummary {
   skills: PluginSkill[];
   agents: PluginAgent[];
   mcpServers: McpServer[];
+  source: HookSource;
+  enabled: boolean;
 }
 
 export interface SnapshotData {
@@ -134,6 +163,7 @@ export interface SnapshotData {
   projectRoot?: string;
   plugins: PluginSummary[];
   settingsMcpServers: McpServer[];
+  settingsHooks: SettingsHookEntry[];
   pathBinaries: Record<string, string[]>;
   capturedAt: string;
   fingerprint: string;

@@ -11,6 +11,7 @@ describe("classifyHookScript", () => {
     expect(
       classifyHookScript({
         command: "x",
+        kind: "command",
         scriptSource: "const updatedInput = { x: 1 };\nprocess.stdout.write(updatedInput);",
       }),
     ).toBe("mutates");
@@ -20,6 +21,7 @@ describe("classifyHookScript", () => {
     expect(
       classifyHookScript({
         command: "x",
+        kind: "command",
         scriptSource: "updatedInput.command = 'echo 1';",
       }),
     ).toBe("mutates");
@@ -29,6 +31,7 @@ describe("classifyHookScript", () => {
     expect(
       classifyHookScript({
         command: "x",
+        kind: "command",
         scriptSource:
           "const out = { hookSpecificOutput: { updatedInput: { cmd: 'x' } } };",
       }),
@@ -39,6 +42,7 @@ describe("classifyHookScript", () => {
     expect(
       classifyHookScript({
         command: "x",
+        kind: "command",
         scriptSource: "console.log('noop');",
       }),
     ).toBe("readonly");
@@ -46,7 +50,7 @@ describe("classifyHookScript", () => {
 
   it("treats missing scriptSource as unknown", () => {
     expect(
-      classifyHookScript({ command: "x", scriptSource: "" }),
+      classifyHookScript({ command: "x", kind: "command", scriptSource: "" }),
     ).toBe("unknown");
   });
 });
