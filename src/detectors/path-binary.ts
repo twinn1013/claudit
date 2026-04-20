@@ -42,10 +42,16 @@ export interface PathBinaryDetectorOptions {
   /** Override for tests — supply contents keyed by absolute path. */
   readFile?: (path: string) => Promise<Buffer>;
   /**
-   * Override for tests. Default `fs.lstat` so symlinks are not followed
-   * before we've decided whether the entry is a plain file.
+   * Override for tests. Default `fs.stat` so symlinks are followed to their
+   * resolved target before we check whether the entry is a plain executable.
    */
-  lstat?: (path: string) => Promise<Stats>;
+  stat?: (path: string) => Promise<Stats>;
+  /**
+   * Override for tests. Default `fs.realpath` to resolve symlink chains.
+   * Used to obtain the canonical path whose content we hash, so two symlinks
+   * pointing at the same target always produce the same hash.
+   */
+  realpath?: (path: string) => Promise<string>;
   /** Override allowlist. Defaults to BENIGN_SYSTEM_BINARIES. */
   allowlist?: ReadonlySet<string>;
 }
@@ -54,12 +60,14 @@ export class PathBinaryDetector implements Detector {
   readonly category = "path-binary" as const;
 
   private readonly readFile: (path: string) => Promise<Buffer>;
-  private readonly lstat: (path: string) => Promise<Stats>;
+  private readonly stat: (path: string) => Promise<Stats>;
+  private readonly realpath: (path: string) => Promise<string>;
   private readonly allowlist: ReadonlySet<string>;
 
   constructor(options: PathBinaryDetectorOptions = {}) {
     this.readFile = options.readFile ?? ((p) => fs.readFile(p));
-    this.lstat = options.lstat ?? ((p) => fs.lstat(p));
+    this.stat = options.stat ?? ((p) => fs.stat(p));
+    this.realpath = options.realpath ?? ((p) => fs.realpath(p));
     this.allowlist = options.allowlist ?? BENIGN_SYSTEM_BINARIES;
   }
 
@@ -72,44 +80,32 @@ export class PathBinaryDetector implements Detector {
       const hashes = await Promise.all(
         paths.map(async (p) => ({ path: p, hash: await this.safeHash(p) })),
       );
-      const uniqueHashes = new Set(
-        hashes.map((h) => h.hash).filter((h): h is string => h !== null),
-      );
-      const anyUnreadable = hashes.some((h) => h.hash === null);
 
-      let confidence: Collision["confidence"];
-      let message: string;
-      if (!anyUnreadable && uniqueHashes.size === 1) {
-        // all copies byte-identical (likely hard link / build artifact dupe) — skip
+      // Filter out entries that returned null (non-executable, unreadable,
+      // symlink loop, or non-file). Only consider valid executable entries.
+      const valid = hashes.filter((h): h is { path: string; hash: string } => h.hash !== null);
+      if (valid.length < 2) continue;
+
+      const uniqueHashes = new Set(valid.map((h) => h.hash));
+      if (uniqueHashes.size === 1) {
+        // all executable copies byte-identical (likely hard link / same target) — skip
         continue;
-      } else if (!anyUnreadable) {
-        confidence = "definite";
-        message = `Binary "${name}" appears at ${paths.length} PATH locations with ${uniqueHashes.size} distinct contents — earlier PATH entries shadow later ones.`;
-      } else if (uniqueHashes.size >= 2) {
-        confidence = "definite";
-        message = `Binary "${name}" appears at ${paths.length} PATH locations with at least ${uniqueHashes.size} distinct contents (some copies could not be hashed).`;
-      } else {
-        confidence = "possible";
-        message = `Binary "${name}" appears at ${paths.length} PATH locations; content comparison was not possible.`;
       }
+
+      const validPaths = valid.map((h) => h.path);
+      const message = `Binary "${name}" appears at ${validPaths.length} PATH locations with ${uniqueHashes.size} distinct contents — earlier PATH entries shadow later ones.`;
 
       collisions.push({
         category: "path-binary",
         severity: "warning",
-        confidence,
-        entities_involved: paths,
+        confidence: "definite",
+        entities_involved: validPaths,
         suggested_fix: [
           {
             command: `which -a ${name}`,
             scope: "shell",
             safety_level: "safe",
             rationale: "List every copy on your PATH to decide which to keep.",
-          },
-          {
-            command: `# remove the unwanted copy of ${name} or adjust PATH order`,
-            scope: "shell",
-            safety_level: "manual-review",
-            rationale: `Differing copies of "${name}" typically indicate a name collision between an OS package and a language-specific install (e.g. cargo, brew, pipx).`,
           },
         ],
         message,
@@ -120,12 +116,23 @@ export class PathBinaryDetector implements Detector {
 
   private async safeHash(path: string): Promise<string | null> {
     try {
-      // `lstat` so we don't follow a symlink into a device or FIFO. If the
-      // entry is a symlink to a regular file that is fine — we just refuse
-      // to hash anything that is not already a plain file at this path.
-      const stat = await this.lstat(path);
-      if (!stat.isFile()) return null;
-      const buf = await this.readFile(path);
+      // Follow symlinks via `stat` so legitimate shims (e.g. Homebrew stubs)
+      // are treated as the file they point at.
+      const statResult = await this.stat(path);
+      if (!statResult.isFile()) return null;
+
+      // Executable-bit filter — skip non-executable files in PATH dirs.
+      // On Windows `mode` is always 0o666/0o777, so we skip the check there.
+      if (process.platform !== "win32") {
+        const isExec = (statResult.mode & 0o111) !== 0;
+        if (!isExec) return null;
+      }
+
+      // Resolve symlink chain to canonical path. Hash the target's content so
+      // two symlinks pointing at the same binary produce the same hash.
+      // ELOOP (circular symlinks) and other resolution errors → skip entry.
+      const resolved = await this.realpath(path);
+      const buf = await this.readFile(resolved);
       return createHash("sha256").update(buf).digest("hex");
     } catch {
       return null;
