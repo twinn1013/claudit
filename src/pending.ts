@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { redactCommand } from "./redactor.js";
 
 /** Default pending marker directory — `~/.claude/claudit/pending/`. */
 export const defaultPendingDir = (): string =>
@@ -42,7 +43,11 @@ export async function writePendingMarker(
   const name = `${safeTs}-${hash}.json`;
   const target = join(dir, name);
   const tmp = `${target}.tmp`;
-  await fsImpl.writeFile(tmp, JSON.stringify(options.marker), "utf8");
+  const redacted: PendingMarker = {
+    ...options.marker,
+    command: redactCommand(options.marker.command),
+  };
+  await fsImpl.writeFile(tmp, JSON.stringify(redacted), "utf8");
   await fsImpl.rename(tmp, target);
   return target;
 }

@@ -95,3 +95,8 @@ export const CONFIDENCE_ORDER: readonly Confidence[] = [
   "possible",
   "unknown",
 ];
+
+// Re-export redaction constants so consumers have a single import source
+// for all policy-level configuration.
+export { DEFAULT_REDACTOR_PATTERNS, redactCommand } from "./redactor.js";
+export type { RedactorPattern, RedactorPatterns } from "./redactor.js";

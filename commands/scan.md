@@ -26,21 +26,60 @@ The decoded JSON payload has this shape:
       "severity": "critical|warning|info",
       "confidence": "definite|possible|unknown",
       "entities_involved": ["..."],
-      "suggested_fix": [{ "command": "...", "scope": "...", "safety_level": "...", "rationale": "..." }],
+      "suggested_fix": [{ "command": "...", "scope": "...", "safety_level": "safe|destructive|manual-review", "rationale": "..." }],
       "message": "human summary"
     }
   ],
-  "metadata": { "timestamp": "...", "scan_duration_ms": N, "detector_count": 6, "error_count": N }
+  "metadata": { "timestamp": "...", "scan_duration_ms": 42, "detector_count": 6, "error_count": 0 }
 }
 ```
 
 ## Step 2 — explain the findings
 
-- If `collisions` is empty, tell the user "no conflicts detected" and show the scan duration.
-- Otherwise, for each collision: translate `category` + `message` into one clear sentence, then list the `entities_involved`. Always surface the `confidence` field — `definite` warrants action, `possible` warrants review, `unknown` means a detector failed and the scan is incomplete.
+Apply all 8 directives below when interpreting the payload.
+
+### Directives for Claude
+
+1. **Base64 decode** the JSON payload from `<claudit-report>` tags before parsing. The raw tag content is base64 — do not parse it directly as JSON.
+
+2. **Map `severity` to visual badges** when presenting each collision:
+   - `critical` → ❗CRITICAL
+   - `high` → ⚠️HIGH
+   - `warning` → ⚠️WARNING
+   - `medium` → ⚠️MEDIUM
+   - `low` → ℹ️LOW
+   - `info` → ℹ️INFO
+
+   Show the badge next to the `message` field so severity is immediately visible.
+
+3. **Gate fix suggestions by `safety_level`**: only offer "run this command" for `safety_level: "safe"` fixes. For `safety_level: "manual-review"`, say "review manually" and describe the steps from the `rationale` field. Never auto-run a `destructive` fix — explain what it would do and require explicit user confirmation before proceeding.
+
+4. **Empty command + manual-review**: when `FixSuggestion.command === ""` and `safety_level: "manual-review"`, do not show an empty command block. Instead, describe the manual remediation steps based on the `rationale` field in plain prose.
+
+5. **No fix suggestion**: for collisions with `suggested_fix: []`, explain why no automated fix is available rather than fabricating one. Example: "This is a namespace ambiguity — Claude Code already handles it via plugin-qualified names, so there is nothing to uninstall or disable."
+
+6. **Group findings by detector category** for readability. Present them in this order: hook-matcher, slash-command, skill-name, subagent-type, mcp-identifier, path-binary, internal-error. Within each group, sort by severity (critical first).
+
+7. **Clean scan confirmation**: if `collisions: []`, say explicitly "no conflicts detected" and show the `scan_duration_ms` value. Do not stay silent or omit the confirmation.
+
+8. **(C3) Namespace disambiguation** — for collisions with `category` in `{slash-command, skill-name, subagent-type}` and `severity: "info"`: do NOT suggest uninstalling or disabling either plugin. Claude Code already resolves these via plugin-qualified names. Explain the disambiguation syntax instead:
+   - Slash commands: `/plugin-a:scan` vs `/plugin-b:scan`
+   - Skills: `plugin-a:skill-name` to invoke a skill from a specific plugin
+   - Agents: `Task(subagent_type="plugin-a:agent-name")` to target a specific plugin's agent
+
+### Example output (one collision)
+
+> ⚠️WARNING — Hook matcher interference on PostToolUse/\*: two hooks from plugin-a and plugin-b both mutate `updatedInput`; the later hook silently overwrites the earlier one.
+>
+> **Entities involved:** plugin-a:PostToolUse:\*, plugin-b:PostToolUse:\*
+> **Confidence:** definite — warrants action
+>
+> **Suggested fix (safe):** Run `claude plugin inspect plugin-a` to review its hook configuration.
 
 ## Step 3 — propose fixes
 
-For each collision, present the `suggested_fix` commands as numbered options. Never run a `destructive` or `manual-review` fix without explicit user approval. `safe` fixes may be offered inline but still require the user to say yes before execution.
+For each collision with a non-empty `suggested_fix`, present the fix options as numbered items. Do not run any fix without user confirmation — even `safe` fixes require the user to say yes.
 
-If the user approves, invoke the fix via the appropriate tool (Bash for shell commands, Edit for file changes). After the fix, re-run `/claudit scan` and confirm the collision is gone.
+If the user approves a fix, invoke it via the appropriate tool (Bash for shell commands, Edit for file changes). After the fix, re-run `/claudit scan` to confirm the collision is gone.
+
+For `confidence: "unknown"` collisions (detector error or timeout), note that the scan is incomplete and suggest re-running after addressing the error shown in `metadata.error_count`.
