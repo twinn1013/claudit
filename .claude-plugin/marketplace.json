@@ -1,0 +1,24 @@
+{
+  "name": "claudit",
+  "description": "claudit — Claude Code configuration conflict scanner (hooks, commands, skills, agents, MCP servers, PATH binaries)",
+  "owner": {
+    "name": "twinn1013",
+    "url": "https://github.com/twinn1013"
+  },
+  "plugins": [
+    {
+      "name": "claudit",
+      "description": "Detects configuration conflicts across installed Claude Code plugins, hooks, commands, MCP servers, and PATH binaries, and surfaces them as Claude-parsable reports.",
+      "version": "0.1.0",
+      "source": ".",
+      "keywords": [
+        "claude-code",
+        "plugin",
+        "conflict-detection",
+        "hooks",
+        "mcp",
+        "path-shadowing"
+      ]
+    }
+  ]
+}
