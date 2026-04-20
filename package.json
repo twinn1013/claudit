@@ -1,0 +1,22 @@
+{
+  "name": "claudit",
+  "version": "0.1.0",
+  "description": "Claude Code plugin that detects configuration conflicts across plugins, hooks, commands, MCP servers, and PATH binaries",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

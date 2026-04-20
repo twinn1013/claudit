@@ -1,0 +1,6 @@
+{
+  "name": "claudit",
+  "version": "0.1.0",
+  "description": "Detects configuration conflicts across Claude Code plugins, hooks, commands, MCP servers, and PATH binaries.",
+  "commands": ["./commands/scan.md"]
+}
