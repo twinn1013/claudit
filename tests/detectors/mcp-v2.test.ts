@@ -143,6 +143,37 @@ describe("MCP detector v2 — extended input sources", () => {
     expect(entities).toContain("project-settings:mcp:foo");
   });
 
+  it("same plugin name across marketplaces stays distinct for MCP origins", async () => {
+    const root = await mkTmp("claudit-mcp-identity-");
+    const globalRoot = join(root, "global");
+    const alphaDir = join(globalRoot, "plugins", "cache", "alpha", "foo", "1.0.0");
+    const betaDir = join(globalRoot, "plugins", "cache", "beta", "foo", "1.0.0");
+
+    await writeJson(join(alphaDir, ".claude-plugin", "plugin.json"), {
+      name: "foo",
+      version: "1.0.0",
+      mcpServers: { search: { tools: ["web"] } },
+    });
+    await writeJson(join(betaDir, ".claude-plugin", "plugin.json"), {
+      name: "foo",
+      version: "1.0.0",
+      mcpServers: { search: { tools: ["index"] } },
+    });
+
+    const data = await new Snapshot({
+      globalRoot,
+      pathOverride: "",
+      homeMcpConfigPath: "/nonexistent/claudit-mcp-identity-home.json",
+      managedSettingsPath: null,
+    }).capture();
+    const collisions = await new McpIdentifierDetector().analyze(data);
+    const definite = collisions.filter((c) => c.confidence === "definite");
+
+    expect(definite).toHaveLength(1);
+    expect(definite[0].entities_involved).toContain("foo@alpha:mcp:search");
+    expect(definite[0].entities_involved).toContain("foo@beta:mcp:search");
+  });
+
   // New: tool-name collision across project + plugin origins → possible/warning
   it("tool-name collision between project-level and plugin servers → possible collision", async () => {
     const data = await makeSnap({

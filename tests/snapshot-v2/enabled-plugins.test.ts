@@ -65,4 +65,41 @@ describe("applyEnabledPluginsFilter", () => {
     expect(data.plugins).toHaveLength(1);
     expect(data.plugins[0]?.enabled).toBe(false);
   });
+
+  it("distinguishes same plugin name across marketplaces by qualified identity", async () => {
+    const globalRoot = await mkTmp("enabled-same-name-");
+    for (const marketplace of ["alpha", "beta"]) {
+      await writeJson(
+        join(
+          globalRoot,
+          "plugins",
+          "cache",
+          marketplace,
+          "foo",
+          "1.0.0",
+          ".claude-plugin",
+          "plugin.json",
+        ),
+        { name: "foo", version: "1.0.0" },
+      );
+    }
+    await writeJson(join(globalRoot, "settings.json"), {
+      enabledPlugins: {
+        "foo@alpha": false,
+        "foo@beta": true,
+      },
+    });
+
+    const data = await new Snapshot({
+      globalRoot,
+      pathOverride: "",
+      ...isolated(),
+    }).capture();
+
+    const byQualifiedName = new Map(
+      data.plugins.map((plugin) => [plugin.qualifiedName, plugin.enabled]),
+    );
+    expect(byQualifiedName.get("foo@alpha")).toBe(false);
+    expect(byQualifiedName.get("foo@beta")).toBe(true);
+  });
 });

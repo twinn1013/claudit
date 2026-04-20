@@ -26,7 +26,7 @@ describe("E2E: flagship RTK + OMC fixture", () => {
     expect(collisions[0].confidence).toBe("definite");
     expect(collisions[0].entities_involved).toContain("user-settings:PreToolUse:*");
     expect(collisions[0].entities_involved).toContain(
-      "oh-my-claudecode:PreToolUse:*",
+      "oh-my-claudecode@omc:PreToolUse:*",
     );
     expect(snapshot.plugins[0]?.pluginRoot).toBe(
       join(

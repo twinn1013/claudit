@@ -38,6 +38,9 @@ describe("parseMatcher", () => {
       tools: new Set(["startup", "clear", "compact"]),
     });
   });
+  it('union containing "*" widens to wildcard', () => {
+    expect(parseMatcher("Edit|*")).toEqual({ wildcard: true });
+  });
 });
 
 describe("matchersOverlap", () => {

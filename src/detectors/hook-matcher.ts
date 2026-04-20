@@ -1,4 +1,5 @@
 import type { Detector } from "../detector.js";
+import { pluginOrigin } from "../plugin-identity.js";
 import type {
   Collision,
   HookScript,
@@ -44,6 +45,23 @@ export function classifyHookScript(script: HookScript): MutationClass {
   }
   // Explicit updatedInput field in a returned/emitted object literal.
   if (/[{,]\s*updatedInput\s*:/.test(source)) {
+    return "mutates";
+  }
+  // Common helper-based/object mutation forms.
+  if (/Object\.assign\(\s*updatedInput\b/.test(source)) {
+    return "mutates";
+  }
+  if (/Reflect\.set\(\s*updatedInput\b/.test(source)) {
+    return "mutates";
+  }
+  if (/delete\s+updatedInput(?:\.\s*[A-Za-z_$][\w$]*|\s*\[[^\]]+\])/.test(source)) {
+    return "mutates";
+  }
+  if (
+    /updatedInput(?:\.\s*[A-Za-z_$][\w$]*|\s*\[[^\]]+\])*\.(?:push|pop|shift|unshift|splice)\s*\(/.test(
+      source,
+    )
+  ) {
     return "mutates";
   }
   // Writing to hookSpecificOutput alongside updatedInput (CC convention).
@@ -195,7 +213,7 @@ function flattenAllHooks(snapshot: SnapshotData): HookAtMatcher[] {
         const parsedMatcher = parseMatcher(rawMatcher);
         for (const script of reg.hooks) {
           // Plugin entries: entity = "${plugin.name}:${event}:${matcher}"
-          const entity = `${plugin.name}:${event}:${rawMatcher}`;
+          const entity = `${pluginOrigin(plugin)}:${event}:${rawMatcher}`;
           entries.push({
             entity,
             enabled: plugin.enabled,
@@ -242,48 +260,89 @@ function normaliseRawMatcher(matcher: string | undefined): string {
 }
 
 /**
- * Group entries by overlapping matchers on the same event using union-find.
+ * Group entries into maximal pairwise-overlapping cliques on the same event.
  *
- * Algorithm:
- * 1. For each pair (i < j) on the same event, if their matchers overlap,
- *    union them.
- * 2. Extract connected components — each is one group.
+ * This avoids false positives from transitive chains like:
+ *   Bash|Read  --overlaps--> Read|Edit  --overlaps--> Edit|Write
+ * where the first and third entries never run on the same tool invocation.
  */
 function groupByOverlap(entries: HookAtMatcher[]): HookAtMatcher[][] {
-  const n = entries.length;
-  const parent = Array.from({ length: n }, (_, i) => i);
+  const byEvent = new Map<string, HookAtMatcher[]>();
+  for (const entry of entries) {
+    const group = byEvent.get(entry.event) ?? [];
+    group.push(entry);
+    byEvent.set(entry.event, group);
+  }
 
-  function find(x: number): number {
-    while (parent[x] !== x) {
-      parent[x] = parent[parent[x]]!; // path compression
-      x = parent[x]!;
+  const groups: HookAtMatcher[][] = [];
+  for (const eventEntries of byEvent.values()) {
+    for (const clique of maximalCliques(eventEntries)) {
+      if (clique.length >= 2) groups.push(clique);
     }
-    return x;
+  }
+  return groups;
+}
+
+function maximalCliques(entries: HookAtMatcher[]): HookAtMatcher[][] {
+  const adjacency = new Map<HookAtMatcher, Set<HookAtMatcher>>();
+  for (const entry of entries) {
+    adjacency.set(entry, new Set());
   }
 
-  function union(a: number, b: number): void {
-    parent[find(a)] = find(b);
-  }
-
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      if (
-        entries[i].event === entries[j].event &&
-        matchersOverlap(entries[i].parsedMatcher, entries[j].parsedMatcher)
-      ) {
-        union(i, j);
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      if (matchersOverlap(entries[i].parsedMatcher, entries[j].parsedMatcher)) {
+        adjacency.get(entries[i])?.add(entries[j]);
+        adjacency.get(entries[j])?.add(entries[i]);
       }
     }
   }
 
-  // Build component map.
-  const components = new Map<number, HookAtMatcher[]>();
-  for (let i = 0; i < n; i++) {
-    const root = find(i);
-    const component = components.get(root) ?? [];
-    component.push(entries[i]);
-    components.set(root, component);
+  const cliques: HookAtMatcher[][] = [];
+  bronKerbosch(
+    new Set(),
+    new Set(entries),
+    new Set(),
+    adjacency,
+    cliques,
+  );
+  return cliques;
+}
+
+function bronKerbosch(
+  clique: Set<HookAtMatcher>,
+  candidates: Set<HookAtMatcher>,
+  excluded: Set<HookAtMatcher>,
+  adjacency: Map<HookAtMatcher, Set<HookAtMatcher>>,
+  output: HookAtMatcher[][],
+): void {
+  if (candidates.size === 0 && excluded.size === 0) {
+    output.push([...clique]);
+    return;
   }
 
-  return [...components.values()];
+  const pivot = [...candidates, ...excluded][0];
+  const pivotNeighbors = pivot ? adjacency.get(pivot) ?? new Set() : new Set();
+  const expandable = [...candidates].filter((node) => !pivotNeighbors.has(node));
+
+  for (const node of expandable) {
+    const neighbors = adjacency.get(node) ?? new Set();
+    bronKerbosch(
+      new Set(clique).add(node),
+      intersectSets(candidates, neighbors),
+      intersectSets(excluded, neighbors),
+      adjacency,
+      output,
+    );
+    candidates.delete(node);
+    excluded.add(node);
+  }
+}
+
+function intersectSets<T>(left: Set<T>, right: Set<T>): Set<T> {
+  const result = new Set<T>();
+  for (const value of left) {
+    if (right.has(value)) result.add(value);
+  }
+  return result;
 }

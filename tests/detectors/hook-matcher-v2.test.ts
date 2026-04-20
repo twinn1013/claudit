@@ -103,6 +103,59 @@ describe("EC1 — cross-source * / * both mutating", () => {
   });
 });
 
+describe("EC1c — same plugin name across marketplaces stays distinct in hook entities", () => {
+  it("uses marketplace-qualified plugin identities for hook entities", async () => {
+    const snap = emptySnapshot({
+      plugins: [
+        {
+          name: "foo",
+          marketplace: "alpha",
+          pluginRoot: "/plugins/cache/alpha/foo/1.0.0",
+          source: "plugin-cache",
+          enabled: false,
+          hookEvents: {
+            PreToolUse: [
+              {
+                matcher: "*",
+                source: "plugin-cache",
+                hooks: [mutatingScript({ command: "hook-alpha" })],
+              },
+            ],
+          },
+          commands: [],
+          skills: [],
+          agents: [],
+          mcpServers: [],
+        },
+        {
+          name: "foo",
+          marketplace: "beta",
+          pluginRoot: "/plugins/cache/beta/foo/1.0.0",
+          source: "plugin-cache",
+          enabled: true,
+          hookEvents: {
+            PreToolUse: [
+              {
+                matcher: "*",
+                source: "plugin-cache",
+                hooks: [mutatingScript({ command: "hook-beta" })],
+              },
+            ],
+          },
+          commands: [],
+          skills: [],
+          agents: [],
+          mcpServers: [],
+        },
+      ],
+    });
+
+    const collisions = await new HookMatcherDetector().analyze(snap);
+    expect(collisions.some((c) => c.entities_involved.includes("foo@alpha:PreToolUse:*"))).toBe(true);
+    expect(collisions.some((c) => c.entities_involved.includes("foo@beta:PreToolUse:*"))).toBe(true);
+  });
+});
+
 describe("EC1b — RTK command is treated as a known mutating hook", () => {
   it("classifies `rtk hook claude` as mutating without local script source", () => {
     const script: HookScript = {

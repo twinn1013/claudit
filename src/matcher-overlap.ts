@@ -27,6 +27,7 @@ export function parseMatcher(raw: string | undefined): MatcherSet {
 
   const pieces = trimmed.split("|").map((p) => p.trim()).filter((p) => p.length > 0);
   if (pieces.length === 0) return { wildcard: true };
+  if (pieces.includes("*")) return { wildcard: true };
 
   return { wildcard: false, tools: new Set(pieces) };
 }

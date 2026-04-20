@@ -8,6 +8,7 @@
 
 export interface PluginRef {
   name: string;
+  publicName?: string;
   enabled: boolean;
 }
 
@@ -31,22 +32,24 @@ export function formatDisambiguationMessage(
   plugins: PluginRef[],
 ): string {
   const pluginNames = plugins.map((p) => p.name);
+  const publicNames = plugins.map((p) => p.publicName ?? p.name);
   const disabledNames = plugins.filter((p) => !p.enabled).map((p) => p.name);
+  const uniquePublicNames = [...new Set(publicNames)];
 
   let invocationExamples: string;
   if (kind === "command") {
-    invocationExamples = pluginNames
+    invocationExamples = uniquePublicNames
       .slice(0, 2)
       .map((p) => `/${p}:${name}`)
       .join(" or ");
   } else if (kind === "skill") {
-    invocationExamples = pluginNames
+    invocationExamples = uniquePublicNames
       .slice(0, 2)
       .map((p) => `${p}:${name}`)
       .join(" or ");
   } else {
     // agent
-    invocationExamples = pluginNames
+    invocationExamples = uniquePublicNames
       .slice(0, 2)
       .map((p) => `${p}:${name}`)
       .join(" or ");
@@ -61,6 +64,10 @@ export function formatDisambiguationMessage(
     msg = `Multiple plugins define skill "${name}": ${listStr}. Use ${invocationExamples} to disambiguate.`;
   } else {
     msg = `Multiple plugins define subagent "${name}": ${listStr}. Use ${invocationExamples} when invoking the Agent tool.`;
+  }
+
+  if (uniquePublicNames.length < pluginNames.length) {
+    msg += " Some installed plugins share the same public plugin name, so marketplace-qualified internal identities are shown above.";
   }
 
   if (disabledNames.length > 0) {

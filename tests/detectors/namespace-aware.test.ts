@@ -62,6 +62,31 @@ describe("namespace-aware: slash-command", () => {
     expect(collisions[0].message.toLowerCase()).toContain("disabled");
     expect(collisions[0].message).toContain("plugin-b");
   });
+
+  it("same plugin name across marketplaces stays distinct in entities", async () => {
+    const data = makeSnapshot([
+      {
+        name: "foo",
+        marketplace: "alpha",
+        pluginRoot: "/plugins/cache/alpha/foo/1.0.0",
+        commands: [{ name: "scan" }],
+      },
+      {
+        name: "foo",
+        marketplace: "beta",
+        pluginRoot: "/plugins/cache/beta/foo/1.0.0",
+        commands: [{ name: "scan" }],
+      },
+    ]);
+    const collisions = await new SlashCommandDetector().analyze(data);
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0].entities_involved).toEqual([
+      "foo@alpha:/scan",
+      "foo@beta:/scan",
+    ]);
+    expect(collisions[0].message).toContain("foo@alpha");
+    expect(collisions[0].message).toContain("foo@beta");
+  });
 });
 
 describe("namespace-aware: skill-name", () => {
@@ -78,6 +103,30 @@ describe("namespace-aware: skill-name", () => {
     expect(nameCols[0].message).toContain("plugin-a:deep-dive");
     expect(nameCols[0].message).toContain("plugin-b:deep-dive");
   });
+
+  it("same plugin name across marketplaces stays distinct for skill collisions", async () => {
+    const data = makeSnapshot([
+      {
+        name: "foo",
+        marketplace: "alpha",
+        pluginRoot: "/plugins/cache/alpha/foo/1.0.0",
+        skills: [{ name: "deep-dive", triggerKeywords: [] }],
+      },
+      {
+        name: "foo",
+        marketplace: "beta",
+        pluginRoot: "/plugins/cache/beta/foo/1.0.0",
+        skills: [{ name: "deep-dive", triggerKeywords: [] }],
+      },
+    ]);
+    const collisions = await new SkillNameDetector().analyze(data);
+    const nameCols = collisions.filter((c) => !c.entities_involved[0].includes(":trigger:"));
+    expect(nameCols).toHaveLength(1);
+    expect(nameCols[0].entities_involved).toEqual([
+      "foo@alpha:skill:deep-dive",
+      "foo@beta:skill:deep-dive",
+    ]);
+  });
 });
 
 describe("namespace-aware: subagent-type", () => {
@@ -92,6 +141,29 @@ describe("namespace-aware: subagent-type", () => {
     expect(collisions[0].confidence).toBe("possible");
     expect(collisions[0].message).toContain("plugin-a:code-reviewer");
     expect(collisions[0].message).toContain("plugin-b:code-reviewer");
+  });
+
+  it("same plugin name across marketplaces stays distinct for agent collisions", async () => {
+    const data = makeSnapshot([
+      {
+        name: "foo",
+        marketplace: "alpha",
+        pluginRoot: "/plugins/cache/alpha/foo/1.0.0",
+        agents: [{ name: "code-reviewer" }],
+      },
+      {
+        name: "foo",
+        marketplace: "beta",
+        pluginRoot: "/plugins/cache/beta/foo/1.0.0",
+        agents: [{ name: "code-reviewer" }],
+      },
+    ]);
+    const collisions = await new SubagentTypeDetector().analyze(data);
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0].entities_involved).toEqual([
+      "foo@alpha:agent:code-reviewer",
+      "foo@beta:agent:code-reviewer",
+    ]);
   });
 });
 

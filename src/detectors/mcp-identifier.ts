@@ -1,4 +1,5 @@
 import type { Detector } from "../detector.js";
+import { pluginOrigin } from "../plugin-identity.js";
 import type { Collision, McpServer, SnapshotData } from "../types.js";
 
 interface ServerOrigin {
@@ -88,7 +89,7 @@ function collectMcpServers(snapshot: SnapshotData): ServerOrigin[] {
   // Plugin-declared servers.
   for (const plugin of snapshot.plugins) {
     for (const m of plugin.mcpServers) {
-      out.push({ name: m.name, origin: plugin.name, tools: m.tools });
+      out.push({ name: m.name, origin: pluginOrigin(plugin), tools: m.tools });
     }
   }
   // User-level settings servers (~/.claude/settings.json, ~/.claude.json, managed).

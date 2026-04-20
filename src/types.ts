@@ -152,6 +152,8 @@ export interface McpServer {
 
 export interface PluginSummary {
   name: string;
+  marketplace?: string;
+  qualifiedName?: string;
   pluginRoot: string;
   hookEvents: Record<string, HookRegistration[]>;
   commands: PluginCommand[];

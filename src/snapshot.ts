@@ -1,12 +1,18 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
-import { delimiter, join, resolve, sep } from "node:path";
+import { delimiter, dirname, join, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import {
   extractFrontmatter,
   parseYamlSubset,
   type ParsedFrontmatter,
 } from "./yaml-frontmatter.js";
+import {
+  buildQualifiedPluginName,
+  derivePluginMarketplace,
+  pluginQualifiedName,
+  resolvePluginEnabledState,
+} from "./plugin-identity.js";
 import type {
   HookRegistration,
   HookScript,
@@ -240,11 +246,12 @@ export class Snapshot {
   }
 
   static diff(prev: SnapshotData, current: SnapshotData): SnapshotDiff {
-    // Key by plugin name because that is what the user sees and what other
-    // detectors key off. A plugin that moves on disk but keeps the same name
-    // is treated as "modified", not remove+add.
-    const prevPlugins = indexBy(prev.plugins, (p) => p.name);
-    const currPlugins = indexBy(current.plugins, (p) => p.name);
+    // Key by marketplace-qualified identity when available so same-name
+    // plugins from different marketplaces do not collapse together. A plugin
+    // that moves on disk but keeps the same qualified identity is treated as
+    // "modified", not remove+add.
+    const prevPlugins = indexBy(prev.plugins, (p) => pluginQualifiedName(p));
+    const currPlugins = indexBy(current.plugins, (p) => pluginQualifiedName(p));
     const added: PluginSummary[] = [];
     const removed: PluginSummary[] = [];
     const modified: Array<{ before: PluginSummary; after: PluginSummary }> = [];
@@ -461,8 +468,11 @@ export class Snapshot {
       pluginJson,
       this.fs,
     );
+    const marketplace = derivePluginMarketplace(pluginRoot, source);
     return {
       name,
+      marketplace,
+      qualifiedName: buildQualifiedPluginName(name, marketplace),
       pluginRoot,
       commands,
       hookEvents,
@@ -497,6 +507,7 @@ export class Snapshot {
       "user-settings-local",
       out,
     );
+    await this.mergeProjectMcpFile(join(globalRoot, ".mcp.json"), out);
 
     // Delta 1: probe ~/.claude.json for a top-level `mcpServers` map.
     const homeMcpPath =
@@ -576,7 +587,11 @@ export class Snapshot {
             matcher?: string;
             hooks?: unknown;
           };
-          const hookList = normalizeSettingsHookScripts(e.hooks);
+          const hookList = await normalizeSettingsHookScripts(
+            e.hooks,
+            dirname(path),
+            this.fs,
+          );
           into.settingsHooks.push({
             event,
             matcher: typeof e.matcher === "string" ? e.matcher : undefined,
@@ -751,6 +766,7 @@ async function captureHookEvents(
               pluginRoot,
               command,
               fsImpl,
+              { confinementRoot: pluginRoot },
             );
             if (resolved.path) hookScript.scriptPath = resolved.path;
             if (resolved.source) hookScript.scriptSource = resolved.source;
@@ -771,7 +787,11 @@ async function captureHookEvents(
   }
 }
 
-function normalizeSettingsHookScripts(raw: unknown): HookScript[] {
+async function normalizeSettingsHookScripts(
+  raw: unknown,
+  baseDir: string,
+  fsImpl: typeof fs,
+): Promise<HookScript[]> {
   if (!Array.isArray(raw)) return [];
   const out: HookScript[] = [];
   for (const entry of raw) {
@@ -779,7 +799,15 @@ function normalizeSettingsHookScripts(raw: unknown): HookScript[] {
     const script = entry as Record<string, unknown>;
     const command = typeof script.command === "string" ? script.command : "";
     const kind = classifyHookKind(script.type);
-    out.push({ command, kind, rawConfig: script });
+    const hookScript: HookScript = { command, kind, rawConfig: script };
+    if (kind === "command" && command.length > 0) {
+      const resolved = await resolveHookScript(baseDir, command, fsImpl, {
+        confinementRoot: null,
+      });
+      if (resolved.path) hookScript.scriptPath = resolved.path;
+      if (resolved.source) hookScript.scriptSource = resolved.source;
+    }
+    out.push(hookScript);
   }
   return out;
 }
@@ -798,24 +826,29 @@ function classifyHookKind(type: unknown): HookScript["kind"] {
 }
 
 async function resolveHookScript(
-  pluginRoot: string,
+  baseDir: string,
   rawCommand: string,
   fsImpl: typeof fs,
+  options: { confinementRoot?: string | null } = {},
 ): Promise<{ path?: string; source?: string }> {
-  const withRoot = rawCommand.replaceAll("$CLAUDE_PLUGIN_ROOT", pluginRoot);
+  const withRoot = rawCommand.replaceAll("$CLAUDE_PLUGIN_ROOT", baseDir);
   const match =
-    withRoot.match(/(?:^|\s)(\S+\.m?js|\S+\.sh|\S+\.py)(?=\s|$)/) ?? null;
+    withRoot.match(
+      /(?:^|\s)("[^"]+\.(?:[cm]?js|[jt]s|sh|py)"|'[^']+\.(?:[cm]?js|[jt]s|sh|py)'|\S+\.(?:[cm]?js|[jt]s|sh|py))(?=\s|$)/,
+    ) ?? null;
   if (!match) return {};
   const candidate = stripQuotes(match[1]);
-  const abs = resolve(pluginRoot, candidate);
+  const abs = resolve(baseDir, candidate);
   if (!(await pathExists(abs, fsImpl))) return { path: candidate };
   // Symlink-containment guard: refuse to read a hook script whose realpath
   // escapes the plugin root.
   try {
     const realAbs = await fsImpl.realpath(abs);
-    const realRoot = await fsImpl.realpath(pluginRoot);
-    if (realAbs !== realRoot && !realAbs.startsWith(realRoot + sep)) {
-      return { path: abs };
+    if (options.confinementRoot) {
+      const realRoot = await fsImpl.realpath(options.confinementRoot);
+      if (realAbs !== realRoot && !realAbs.startsWith(realRoot + sep)) {
+        return { path: abs };
+      }
     }
     const stat = await fsImpl.stat(realAbs);
     if (!stat.isFile()) return { path: abs };
@@ -1094,29 +1127,12 @@ function applyEnabledPluginsFilter(
   enabledMap: Record<string, boolean>,
 ): PluginSummary[] {
   return plugins.map((p) => {
-    const enabled = resolveEnabledPluginState(p.name, enabledMap);
+    const enabled = resolvePluginEnabledState(p, enabledMap);
     if (enabled !== null) {
       return { ...p, enabled };
     }
     return p;
   });
-}
-
-function resolveEnabledPluginState(
-  pluginName: string,
-  enabledMap: Record<string, boolean>,
-): boolean | null {
-  if (Object.prototype.hasOwnProperty.call(enabledMap, pluginName)) {
-    return enabledMap[pluginName];
-  }
-
-  for (const [key, value] of Object.entries(enabledMap)) {
-    if (key.split("@", 1)[0] === pluginName) {
-      return value;
-    }
-  }
-
-  return null;
 }
 
 function commandBaseName(pathOrName: string): string | null {

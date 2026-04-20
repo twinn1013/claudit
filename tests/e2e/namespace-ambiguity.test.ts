@@ -47,8 +47,8 @@ describe("E2E: namespace ambiguity via real plugin cache fixtures", () => {
     expect(collisions[0].severity).toBe("info");
     expect(collisions[0].confidence).toBe("possible");
     expect(collisions[0].entities_involved).toEqual([
-      "alpha-tools:/scan",
-      "beta-tools:/scan",
+      "alpha-tools@alpha-market:/scan",
+      "beta-tools@beta-market:/scan",
     ]);
     expect(collisions[0].message).toContain("/alpha-tools:scan");
     expect(collisions[0].message).toContain("/beta-tools:scan");
