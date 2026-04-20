@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.local
+.omc/state/
+.omc/sessions/
+.omc/logs/
+
