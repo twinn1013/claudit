@@ -40,6 +40,9 @@ describe("Snapshot.capture", () => {
     const snap = new Snapshot({
       globalRoot,
       pathOverride: pathDir,
+      // Isolate test from real ~/.claude.json and OS managed-settings leak.
+      homeMcpConfigPath: "/nonexistent/claudit-test-home.json",
+      managedSettingsPath: null,
     });
     const data = await snap.capture();
 
@@ -73,7 +76,12 @@ describe("Snapshot.capture", () => {
 
   it("handles a missing plugins directory without throwing", async () => {
     const empty = await makeTempDir("empty-root-");
-    const snap = new Snapshot({ globalRoot: empty, pathOverride: "" });
+    const snap = new Snapshot({
+      globalRoot: empty,
+      pathOverride: "",
+      homeMcpConfigPath: "/nonexistent/claudit-test-home.json",
+      managedSettingsPath: null,
+    });
     const data = await snap.capture();
     expect(data.plugins).toEqual([]);
     expect(data.settingsMcpServers).toEqual([]);

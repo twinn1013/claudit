@@ -134,10 +134,14 @@ export interface PluginCommand {
 export interface PluginSkill {
   name: string;
   triggerKeywords: string[];
+  /** YAML parser warnings surfaced from the SKILL.md frontmatter (R2). */
+  parseWarnings?: string[];
 }
 
 export interface PluginAgent {
   name: string;
+  /** YAML parser warnings surfaced from the agent.md frontmatter (R2). */
+  parseWarnings?: string[];
 }
 
 export interface McpServer {
