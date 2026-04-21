@@ -1,7 +1,12 @@
+import { execFile } from "node:child_process";
+import { promises as fs } from "node:fs";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { main, runScan } from "../../src/commands/scan.js";
 import { Report } from "../../src/report.js";
 import { makeGlobalRoot, makeTempDir } from "../helpers/fixtures.js";
+
+const execFileAsync = promisify(execFile);
 
 describe("/claudit scan command", () => {
   it("runScan() returns a Report whose collisions match SessionStart output for the same snapshot", async () => {
@@ -44,5 +49,27 @@ describe("/claudit scan command", () => {
     expect(combined).toContain("</claudit-report>");
     const parsed = Report.parse(combined);
     expect(parsed.metadata.detector_count).toBe(6);
+  });
+
+  it("scan.md command falls back to the cwd plugin root when CLAUDE_PLUGIN_ROOT is unset", async () => {
+    const markdown = await fs.readFile("commands/scan.md", "utf8");
+    const shell = markdown.match(/```bash\n([\s\S]*?)```/)?.[1];
+    expect(shell).toBeTruthy();
+
+    const { stdout } = await execFileAsync(
+      "/bin/bash",
+      ["-lc", shell!],
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          CLAUDE_PLUGIN_ROOT: "",
+        },
+        maxBuffer: 1024 * 1024 * 2,
+      },
+    );
+
+    expect(stdout).toContain("<claudit-report>");
+    expect(stdout).toContain("</claudit-report>");
   });
 });

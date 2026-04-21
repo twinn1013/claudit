@@ -11,7 +11,17 @@ Run a full conflict scan on demand, then walk the user through any findings in n
 Execute the compiled scanner CLI via the Bash tool:
 
 ```bash
-node "$CLAUDE_PLUGIN_ROOT/dist/commands/scan.mjs"
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-}"
+if [ -z "$PLUGIN_ROOT" ] || [ ! -f "$PLUGIN_ROOT/dist/commands/scan.mjs" ]; then
+  if [ -f "./dist/commands/scan.mjs" ] && [ -f "./.claude-plugin/plugin.json" ]; then
+    PLUGIN_ROOT="$(pwd)"
+  else
+    echo "claudit scan bootstrap failed: CLAUDE_PLUGIN_ROOT is unset and local plugin root could not be inferred" >&2
+    exit 1
+  fi
+fi
+
+node "$PLUGIN_ROOT/dist/commands/scan.mjs"
 ```
 
 The command prints a single line wrapped in `<claudit-report>...</claudit-report>` tags. The content between the tags is a **base64-encoded JSON payload** — decode it with `Buffer.from(content, "base64").toString("utf8")` (Node.js) or `atob(content)` (browser/Deno) before parsing as JSON.
