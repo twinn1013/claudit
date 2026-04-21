@@ -7,8 +7,10 @@
 import type { Confidence, Severity } from "./types.js";
 import { DEFAULT_REDACTOR_PATTERNS } from "./redactor.js";
 
-/** Per-detector wall-clock budget enforced by the Scanner. */
-export const DETECTOR_TIMEOUT_MS = 100;
+/** Default per-detector wall-clock budget enforced by the Scanner. */
+export const PER_DETECTOR_TIMEOUT_MS = 500;
+/** @deprecated use PER_DETECTOR_TIMEOUT_MS instead. */
+export const DETECTOR_TIMEOUT_MS = PER_DETECTOR_TIMEOUT_MS;
 
 /** PostToolUse hook latency target (trigger only — no scanning). */
 export const POST_TOOL_USE_BUDGET_MS = 200;
@@ -110,6 +112,19 @@ export const REDACTION_PATTERN_NAMES = DEFAULT_REDACTOR_PATTERNS.patterns.map(
   (pattern) => pattern.name,
 );
 export const REDACTION_PATTERN_COUNT = REDACTION_PATTERN_NAMES.length;
+
+/** Resolve the detector timeout using explicit override first, then env, then default. */
+export function resolveDetectorTimeoutMs(explicit?: number): number {
+  if (typeof explicit === "number" && Number.isFinite(explicit) && explicit > 0) {
+    return explicit;
+  }
+
+  const raw = process.env.CLAUDIT_DETECTOR_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+
+  return PER_DETECTOR_TIMEOUT_MS;
+}
 
 // Re-export redaction constants so consumers have a single import source
 // for all policy-level configuration.

@@ -5,12 +5,12 @@ import { PathBinaryDetector } from "./detectors/path-binary.js";
 import { SkillNameDetector } from "./detectors/skill-name.js";
 import { SlashCommandDetector } from "./detectors/slash-command.js";
 import { SubagentTypeDetector } from "./detectors/subagent-type.js";
-import { DETECTOR_TIMEOUT_MS } from "./policies.js";
+import { PER_DETECTOR_TIMEOUT_MS, resolveDetectorTimeoutMs } from "./policies.js";
 import { Report } from "./report.js";
 import type { Collision, SnapshotData } from "./types.js";
 
-/** @deprecated use DETECTOR_TIMEOUT_MS from ./policies instead. */
-export const DEFAULT_DETECTOR_TIMEOUT_MS = DETECTOR_TIMEOUT_MS;
+/** @deprecated use PER_DETECTOR_TIMEOUT_MS from ./policies instead. */
+export const DEFAULT_DETECTOR_TIMEOUT_MS = PER_DETECTOR_TIMEOUT_MS;
 
 export interface ScannerOptions {
   detectors?: Detector[];
@@ -33,7 +33,7 @@ export class Scanner {
 
   constructor(options: ScannerOptions = {}) {
     this.detectors = options.detectors ?? defaultDetectors();
-    this.timeoutMs = options.detectorTimeoutMs ?? DEFAULT_DETECTOR_TIMEOUT_MS;
+    this.timeoutMs = resolveDetectorTimeoutMs(options.detectorTimeoutMs);
     this.now = options.now ?? (() => Date.now());
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Detector } from "../src/detector.js";
 import { DetectorTimeoutError, Scanner } from "../src/scanner.js";
+import { PER_DETECTOR_TIMEOUT_MS } from "../src/policies.js";
 import type { Collision, CollisionCategory, SnapshotData } from "../src/types.js";
 
 const emptySnapshot: SnapshotData = {
@@ -152,5 +153,26 @@ describe("Scanner.run", () => {
         "subagent-type",
       ].sort(),
     );
+  });
+
+  it("uses the policy default timeout budget when no override is supplied", async () => {
+    const slow = stubDetector("path-binary", { delayMs: PER_DETECTOR_TIMEOUT_MS + 50 });
+    const report = await new Scanner({ detectors: [slow] }).run(emptySnapshot);
+    expect(report.collisions).toHaveLength(1);
+    expect(report.collisions[0].message).toContain(String(PER_DETECTOR_TIMEOUT_MS));
+  });
+
+  it("accepts CLAUDIT_DETECTOR_TIMEOUT_MS as an environment override", async () => {
+    const previous = process.env.CLAUDIT_DETECTOR_TIMEOUT_MS;
+    process.env.CLAUDIT_DETECTOR_TIMEOUT_MS = "10";
+    try {
+      const slow = stubDetector("path-binary", { delayMs: 30 });
+      const report = await new Scanner({ detectors: [slow] }).run(emptySnapshot);
+      expect(report.collisions).toHaveLength(1);
+      expect(report.collisions[0].message).toContain("10");
+    } finally {
+      if (previous === undefined) delete process.env.CLAUDIT_DETECTOR_TIMEOUT_MS;
+      else process.env.CLAUDIT_DETECTOR_TIMEOUT_MS = previous;
+    }
   });
 });
