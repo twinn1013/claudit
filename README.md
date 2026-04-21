@@ -2,6 +2,14 @@
 
 Claude Code plugin that detects configuration conflicts across installed plugins, hooks, slash commands, skills, subagents, MCP servers, and PATH binaries — then emits a Claude-parsable report so the assistant can explain the problem and propose fixes.
 
+## Why?
+
+- If you use multiple Claude Code plugins, configuration collisions become likely.
+- Claude Code itself does not detect those conflicts for you.
+- claudit detects them at **SessionStart**, after install-like changes have been observed.
+- Real-world example: `rtk` in `user-settings` on `PreToolUse:Bash` can overlap with `oh-my-claudecode` from plugin scope on `PreToolUse:*`.
+- In my environment, claudit completed a real scan with **19 collisions** in **124ms**.
+
 ## What it is (and is not)
 
 - ✅ **Static analyzer**. Reads hooks, manifests, and binaries at rest and produces structured reports.
@@ -14,19 +22,17 @@ Claude Code plugin that detects configuration conflicts across installed plugins
 
 These instructions target **claudit v0.2.1**.
 
-```sh
-/plugin install claudit         # from the Claude Code plugin marketplace
-```
-
-Or from a local clone:
+Current working install path:
 
 ```sh
 git clone https://github.com/twinn1013/claudit.git
 cd claudit
 npm install
 npm run build
-/plugin install "$(pwd)"
+claude --plugin-dir .
 ```
+
+> Marketplace release is planned for **v0.3**.
 
 ## Usage
 
@@ -105,23 +111,6 @@ SessionStart  ──▶  Snapshot (global + project)
 | `path-binary` | Same binary name at multiple `$PATH` locations with distinct content | definite / possible |
 
 Internal errors (detector timeout / throw) surface as `category: "internal-error"` with `confidence: "unknown"`.
-
-## How it was built
-
-v0.2.1 is the first patch release after real-environment validation. It specifically fixed three issues surfaced by live smoke testing: slash-command bootstrap without `CLAUDE_PLUGIN_ROOT`, same-plugin self-overlap hook noise, and `path-binary` detector timeouts on long `$PATH` environments.
-
-
-v0.2 was rebuilt under a **five-way review lane**:
-
-- `architect`
-- `security-reviewer`
-- `code-reviewer`
-- external Claude review
-- external Gemini review
-
-One concrete outcome of that review stack: the Phase 4 `code-reviewer` lane (Erdos) caught a marketplace-qualified plugin identity bug after Stage 8. That review directly led to `[v2-plugin-identity-fix]`, which centralized plugin identity handling and stopped `foo@alpha` / `foo@beta` from collapsing into one enablement decision.
-
-The rebuild also locked the project's flagship proof-case into the suite: claudit now detects the real **rtk + OMC** PreToolUse overlap scenario end-to-end through `Snapshot -> Scanner -> Report`, instead of only through direct detector fixtures.
 
 ## Limitations (v0.2.1)
 
@@ -215,6 +204,22 @@ tests/
   e2e/                        # real-world scenarios
   ralph-verify-v2.test.ts     # Stage 9 six-criterion verification suite
 ```
+
+## How it was built
+
+v0.2.1 is the first patch release after real-environment validation. It specifically fixed three issues surfaced by live smoke testing: slash-command bootstrap without `CLAUDE_PLUGIN_ROOT`, same-plugin self-overlap hook noise, and `path-binary` detector timeouts on long `$PATH` environments.
+
+v0.2 was rebuilt under a **five-way review lane**:
+
+- `architect`
+- `security-reviewer`
+- `code-reviewer`
+- external Claude review
+- external Gemini review
+
+One concrete outcome of that review stack: the Phase 4 `code-reviewer` lane (Erdos) caught a marketplace-qualified plugin identity bug after Stage 8. That review directly led to `[v2-plugin-identity-fix]`, which centralized plugin identity handling and stopped `foo@alpha` / `foo@beta` from collapsing into one enablement decision.
+
+The rebuild also locked the project's flagship proof-case into the suite: claudit now detects the real **rtk + OMC** PreToolUse overlap scenario end-to-end through `Snapshot -> Scanner -> Report`, instead of only through direct detector fixtures.
 
 ## License
 
