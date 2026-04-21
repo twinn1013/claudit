@@ -1,28 +1,30 @@
 # claudit
 
-Claude Code plugin that detects configuration conflicts across installed plugins, hooks, slash commands, skills, subagents, MCP servers, and PATH binaries — then emits a Claude-parsable report so the assistant can explain the problem and propose fixes.
+[English README](./README.en.md)
 
-## Why?
+설치된 Claude Code 플러그인, 훅, 슬래시 커맨드, 스킬, 서브에이전트, MCP 서버, PATH 바이너리 사이의 설정 충돌을 찾아내고, Claude가 바로 해석할 수 있는 리포트로 내보내는 플러그인입니다.
 
-- If you use multiple Claude Code plugins, configuration collisions become likely.
-- Claude Code itself does not detect those conflicts for you.
-- claudit detects them at **SessionStart**, after install-like changes have been observed.
-- Real-world example: `rtk` in `user-settings` on `PreToolUse:Bash` can overlap with `oh-my-claudecode` from plugin scope on `PreToolUse:*`.
-- In my environment, claudit completed a real scan with **19 collisions** in **124ms**.
+## 왜 필요한가?
 
-## What it is (and is not)
+- Claude Code 플러그인을 여러 개 쓰기 시작하면 설정 충돌이 꽤 쉽게 발생합니다.
+- Claude Code 자체는 이런 충돌을 자동으로 감지해주지 않습니다.
+- claudit은 **SessionStart** 시점에 스냅샷과 이전 상태를 비교해 충돌을 감지합니다.
+- 실전 예시: `user-settings`의 `rtk` `PreToolUse:Bash` 훅과 플러그인 범위의 `oh-my-claudecode` `PreToolUse:*` 훅이 겹칠 수 있습니다.
+- 제 환경에서는 실제 스캔에서 **19 collisions**를 **124ms** 만에 감지했습니다.
 
-- ✅ **Static analyzer**. Reads hooks, manifests, and binaries at rest and produces structured reports.
-- ✅ **Observer, not gatekeeper**. Never mutates user config; never blocks installs.
-- ✅ **Content-aware**. Distinguishes “same matcher with multiple hooks” (fine) from “two hooks mutating `updatedInput` on the same matcher” (collision).
-- ❌ Not a hook interceptor. Doesn't watch runtime execution chains.
-- ❌ Not a daemon. No background process; hooks fire on PostToolUse and SessionStart.
+## 무엇이고, 무엇이 아닌가
 
-## Install
+- ✅ **정적 분석기**입니다. 저장된 훅, 매니페스트, 바이너리를 읽고 구조화된 결과를 만듭니다.
+- ✅ **관찰자**입니다. 사용자 설정을 수정하지 않고, 설치를 막지도 않습니다.
+- ✅ **내용 인지형**입니다. “같은 matcher에 훅이 여러 개 있음”과 “같은 matcher에서 두 훅이 `updatedInput`을 실제로 변경함”을 구분합니다.
+- ❌ 런타임 훅 인터셉터는 아닙니다. 실제 실행 체인을 추적하지 않습니다.
+- ❌ 데몬이 아닙니다. 백그라운드 프로세스 없이 `PostToolUse`와 `SessionStart`에서만 동작합니다.
 
-These instructions target **claudit v0.2.1**.
+## 설치
 
-Current working install path:
+현재 기준 **claudit v0.2.1** 문서입니다.
+
+현재 실제로 동작하는 설치 방법은 아래 한 가지입니다.
 
 ```sh
 git clone https://github.com/twinn1013/claudit.git
@@ -32,21 +34,21 @@ npm run build
 claude --plugin-dir .
 ```
 
-> Marketplace release is planned for **v0.3**.
+> 마켓플레이스 릴리즈는 **v0.3**에서 계획 중입니다.
 
-## Usage
+## 사용법
 
-On-demand scan:
+수동 스캔:
 
 ```
 /claudit scan
 ```
 
-Automatic scan: once installed, the `PostToolUse` hook records install-like Bash commands (brew, npm -g, cargo, pip, pipx, uv, curl|sh, rtk init, claude plugin install, go install), and the `SessionStart` hook runs the full 6-detector scan at the beginning of each session. Claude then walks you through any conflicts.
+자동 스캔: 설치 후 `PostToolUse` 훅이 install 계열 Bash 명령(brew, npm -g, cargo, pip, pipx, uv, curl|sh, rtk init, claude plugin install, go install)을 기록하고, `SessionStart` 훅이 세션 시작 시 전체 6-detector 스캔을 실행합니다. 이후 Claude가 충돌 내용을 자연어로 설명해줍니다.
 
-## Hook + snapshot scope in v0.2
+## v0.2 기준 Hook + Snapshot 범위
 
-v0.2 preserves seven `HookSource` values:
+v0.2는 다음 7개의 `HookSource` 값을 유지합니다.
 
 - `plugin-cache`
 - `plugin-marketplace`
@@ -56,7 +58,7 @@ v0.2 preserves seven `HookSource` values:
 - `project-settings-local`
 - `user-managed`
 
-`HookScript.kind` is also preserved as a discriminator:
+또한 `HookScript.kind` discriminator를 보존합니다.
 
 - `command`
 - `prompt`
@@ -64,9 +66,9 @@ v0.2 preserves seven `HookSource` values:
 - `http`
 - `unknown`
 
-That allows claudit to treat statically analyzable command hooks differently from non-command registrations that should remain `possible` / `unknown`.
+이 덕분에 정적으로 분석 가능한 command 훅과, `possible` / `unknown`으로 남겨야 하는 비-command 훅을 구분할 수 있습니다.
 
-## Architecture
+## 아키텍처
 
 ```
 PostToolUse:Bash  ── regex match ──▶  ~/.claude/claudit/pending/*.json
@@ -86,7 +88,7 @@ SessionStart  ──▶  Snapshot (global + project)
                     │     SubagentTypeDetector,
                     │     McpIdentifierDetector,
                     │     PathBinaryDetector,
-                    │   )  — 500ms default per-detector timeout
+                    │   )  — detector 기본 timeout 500ms
                     │
                     ▼
                    Report
@@ -99,54 +101,54 @@ SessionStart  ──▶  Snapshot (global + project)
               Claude explains → user approves → Claude executes fix
 ```
 
-## The 6 detectors
+## 6개 detector
 
-| Category | What it flags | Confidence |
+| Category | 무엇을 잡는가 | Confidence |
 |----------|---------------|------------|
-| `hook-matcher` | Two hooks on the same event+matcher both mutating `updatedInput` | definite / possible / unknown |
-| `slash-command` | Two plugins register the same command base name | possible |
-| `skill-name` | Two plugins define the same skill; or trigger keywords overlap | possible |
-| `subagent-type` | Two plugins define the same `subagent_type` | possible |
-| `mcp-identifier` | Two sources register the same MCP server, or expose the same tool name | definite / possible |
-| `path-binary` | Same binary name at multiple `$PATH` locations with distinct content | definite / possible |
+| `hook-matcher` | 같은 event+matcher에서 두 훅이 모두 `updatedInput`을 변경하는 경우 | definite / possible / unknown |
+| `slash-command` | 두 플러그인이 같은 command base name을 등록한 경우 | possible |
+| `skill-name` | 두 플러그인이 같은 skill을 정의하거나 trigger keyword가 겹치는 경우 | possible |
+| `subagent-type` | 두 플러그인이 같은 `subagent_type`을 정의한 경우 | possible |
+| `mcp-identifier` | 두 소스가 같은 MCP 서버를 등록하거나 같은 tool name을 노출하는 경우 | definite / possible |
+| `path-binary` | 같은 바이너리 이름이 `$PATH` 여러 위치에 있고 내용이 다른 경우 | definite / possible |
 
-Internal errors (detector timeout / throw) surface as `category: "internal-error"` with `confidence: "unknown"`.
+Detector timeout/throw 같은 내부 오류는 `category: "internal-error"`, `confidence: "unknown"`으로 표시됩니다.
 
-## Limitations (v0.2.1)
+## 한계 (v0.2.1)
 
-claudit is a static analyzer. It does **not**:
+claudit은 정적 분석기이므로 다음은 하지 못합니다.
 
-- Execute hook scripts or observe runtime behaviour
-- Intercept or serialize live hook execution chains
-- Access CC's internal plugin resolution / priority logic
-- Track post-install config mutations (e.g., lazy skill registration)
-- Fully parse arbitrary YAML or regex-heavy matcher syntax outside the supported subset
+- 훅 스크립트를 실제로 실행하거나 런타임 동작을 관찰하지 않음
+- 실제 훅 실행 체인을 인터셉트하거나 serialize하지 않음
+- Claude Code 내부의 플러그인 우선순위 / resolution 로직에 접근하지 않음
+- 설치 후 설정이 동적으로 바뀌는 경우(예: lazy skill registration)를 추적하지 않음
+- 지원하는 subset 밖의 임의 YAML / regex-heavy matcher를 완전하게 파싱하지 않음
 
-These blind spots can produce **false negatives**. The `confidence` field on every Collision signals certainty:
+이런 블라인드 스팟은 **false negative**를 만들 수 있습니다. 각 Collision의 `confidence`는 다음 의미를 가집니다.
 
-- `definite` — static evidence is strong enough to claim the conflict
-- `possible` — claudit sees a real risk, but runtime behaviour still needs confirmation
-- `unknown` — overlapping or unresolved conditions exist, but static analysis could not prove mutation
+- `definite` — 정적 증거만으로 충돌을 주장할 수 있음
+- `possible` — 실제 위험은 보이지만 런타임 확인이 더 필요함
+- `unknown` — 겹치거나 미해결된 조건은 있으나 정적 분석만으로 mutation을 증명하지 못함
 
-Treat `possible` and `unknown` as requiring manual verification.
+`possible`과 `unknown`은 수동 검증이 필요하다고 보는 게 맞습니다.
 
-### False-positive policy
+### False-positive 정책
 
-“Same matcher with multiple hooks” is not a collision by itself. v0.2.1 additionally filters same-owner hook registrations so one plugin's own hook bundle is not reported as a conflict. v0.2.1 reports:
+“같은 matcher에 훅이 여러 개 있다”는 사실만으로는 충돌이 아닙니다. v0.2.1은 추가로 same-owner hook registration을 필터링해서, 한 플러그인 내부 훅 묶음을 충돌로 보고하지 않습니다. 현재 기준:
 
-- `critical/definite` only for proven mutual mutation
-- `warning/possible` when a disabled-plugin or mixed mutating/opaque case can plausibly interfere
-- `info/unknown` when overlapping hooks exist but both sides remain statically opaque
+- 증명된 상호 mutation만 `critical/definite`
+- disabled plugin 또는 mutating/opaque 혼합은 `warning/possible`
+- 둘 다 정적으로 불투명하면 `info/unknown`
 
-Benign system-binary duplicates (`ls`, `cat`, `bash`, …) are allowlisted.
+또한 `ls`, `cat`, `bash` 같은 benign system binary duplicate는 allowlist로 제외합니다.
 
-### False-negative policy
+### False-negative 정책
 
-Runtime-dependent behaviour (hook execution ordering, dynamic variable expansion, CC's merge/de-dup logic) cannot be statically inferred. v0.2.1 expands env-var and script-path handling compared with v0.1, but still uses heuristic static analysis rather than runtime interception. Detector time budgets are also policy-based rather than workload-adaptive, so unusually large environments may still need manual tuning via `CLAUDIT_DETECTOR_TIMEOUT_MS`. See `src/policies.ts` for the full list.
+훅 실행 순서, 동적 변수 확장, Claude Code 내부 merge/de-dup 로직 같은 런타임 의존 동작은 정적으로 확정할 수 없습니다. v0.2.1은 v0.1보다 env-var / script-path 처리를 넓혔지만, 여전히 런타임 인터셉션이 아니라 heuristic static analysis를 사용합니다. 아주 큰 환경에서는 `CLAUDIT_DETECTOR_TIMEOUT_MS`로 detector budget을 조절해야 할 수도 있습니다. 자세한 정책은 `src/policies.ts`를 참고하세요.
 
-## Scan output shape
+## 스캔 출력 형식
 
-Reports are wrapped in `<claudit-report>…</claudit-report>`, where the payload inside the tags is **base64-encoded JSON**:
+리포트는 `<claudit-report>…</claudit-report>` 태그로 감싸지며, 태그 안 payload는 **base64-encoded JSON** 입니다.
 
 ```jsonc
 {
@@ -169,18 +171,18 @@ Reports are wrapped in `<claudit-report>…</claudit-report>`, where the payload
 }
 ```
 
-## Development
+## 개발
 
 ```sh
 npm install
-npx tsup                    # same build tool as npm run build
-npx vitest run              # same test runner as npm test
+npx tsup                    # npm run build와 동일
+npx vitest run              # npm test와 동일
 npm run typecheck           # tsc --noEmit
 npm test                    # vitest run
 npm run build               # tsup → dist/**/*.mjs
 ```
 
-Project layout:
+프로젝트 구조:
 
 ```
 .claude-plugin/plugin.json    # metadata + commands array (string paths)
@@ -198,18 +200,22 @@ src/
   plugin-identity.ts          # marketplace-qualified plugin identity helpers
   hooks/                      # compiled hook entry points
   commands/                   # /claudit scan CLI entry
-  policies.ts                 # detector budgets, namespace severity defaults, redaction policy constants
+  policies.ts                 # detector budget, namespace severity 기본값, redaction policy constants
 dist/                         # tsup output — .mjs entry points referenced by hooks.json
 tests/
-  e2e/                        # real-world scenarios
+  e2e/                        # 실전 시나리오 테스트
   ralph-verify-v2.test.ts     # Stage 9 six-criterion verification suite
 ```
 
-## How it was built
+## 어떻게 만들어졌나
 
-v0.2.1 is the first patch release after real-environment validation. It specifically fixed three issues surfaced by live smoke testing: slash-command bootstrap without `CLAUDE_PLUGIN_ROOT`, same-plugin self-overlap hook noise, and `path-binary` detector timeouts on long `$PATH` environments.
+v0.2.1은 실환경 검증 이후 나온 첫 패치 릴리즈입니다. 실제 스모크 테스트에서 드러난 세 가지 문제를 고쳤습니다.
 
-v0.2 was rebuilt under a **five-way review lane**:
+- `CLAUDE_PLUGIN_ROOT` 없이 `/claudit scan` bootstrap 실패
+- same-plugin self-overlap hook noise
+- 긴 `$PATH` 환경에서 `path-binary` detector timeout
+
+v0.2 자체는 **5-way review**로 리빌드했습니다.
 
 - `architect`
 - `security-reviewer`
@@ -217,9 +223,9 @@ v0.2 was rebuilt under a **five-way review lane**:
 - external Claude review
 - external Gemini review
 
-One concrete outcome of that review stack: the Phase 4 `code-reviewer` lane (Erdos) caught a marketplace-qualified plugin identity bug after Stage 8. That review directly led to `[v2-plugin-identity-fix]`, which centralized plugin identity handling and stopped `foo@alpha` / `foo@beta` from collapsing into one enablement decision.
+그 과정에서 Phase 4의 `code-reviewer` lane(Erdos)가 marketplace-qualified plugin identity 버그를 잡아냈고, 그 결과 `[v2-plugin-identity-fix]`가 들어가 `foo@alpha` / `foo@beta`가 하나의 enablement decision으로 붕괴되는 문제를 막았습니다.
 
-The rebuild also locked the project's flagship proof-case into the suite: claudit now detects the real **rtk + OMC** PreToolUse overlap scenario end-to-end through `Snapshot -> Scanner -> Report`, instead of only through direct detector fixtures.
+또한 이 리빌드는 프로젝트의 flagship proof-case를 테스트에 고정했습니다. 이제 claudit은 실제 **rtk + OMC** `PreToolUse` overlap 시나리오를 `Snapshot -> Scanner -> Report` 전체 파이프라인으로 감지합니다.
 
 ## License
 
