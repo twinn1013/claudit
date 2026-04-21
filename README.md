@@ -12,7 +12,7 @@ Claude Code plugin that detects configuration conflicts across installed plugins
 
 ## Install
 
-These instructions target **claudit v0.2.0**.
+These instructions target **claudit v0.2.1**.
 
 ```sh
 /plugin install claudit         # from the Claude Code plugin marketplace
@@ -80,7 +80,7 @@ SessionStart  ──▶  Snapshot (global + project)
                     │     SubagentTypeDetector,
                     │     McpIdentifierDetector,
                     │     PathBinaryDetector,
-                    │   )  — 100ms per-detector timeout
+                    │   )  — 500ms default per-detector timeout
                     │
                     ▼
                    Report
@@ -108,6 +108,9 @@ Internal errors (detector timeout / throw) surface as `category: "internal-error
 
 ## How it was built
 
+v0.2.1 is the first patch release after real-environment validation. It specifically fixed three issues surfaced by live smoke testing: slash-command bootstrap without `CLAUDE_PLUGIN_ROOT`, same-plugin self-overlap hook noise, and `path-binary` detector timeouts on long `$PATH` environments.
+
+
 v0.2 was rebuilt under a **five-way review lane**:
 
 - `architect`
@@ -120,7 +123,7 @@ One concrete outcome of that review stack: the Phase 4 `code-reviewer` lane (Erd
 
 The rebuild also locked the project's flagship proof-case into the suite: claudit now detects the real **rtk + OMC** PreToolUse overlap scenario end-to-end through `Snapshot -> Scanner -> Report`, instead of only through direct detector fixtures.
 
-## Limitations (v0.2)
+## Limitations (v0.2.1)
 
 claudit is a static analyzer. It does **not**:
 
@@ -140,7 +143,7 @@ Treat `possible` and `unknown` as requiring manual verification.
 
 ### False-positive policy
 
-“Same matcher with multiple hooks” is not a collision by itself. v0.2 reports:
+“Same matcher with multiple hooks” is not a collision by itself. v0.2.1 additionally filters same-owner hook registrations so one plugin's own hook bundle is not reported as a conflict. v0.2.1 reports:
 
 - `critical/definite` only for proven mutual mutation
 - `warning/possible` when a disabled-plugin or mixed mutating/opaque case can plausibly interfere
@@ -150,7 +153,7 @@ Benign system-binary duplicates (`ls`, `cat`, `bash`, …) are allowlisted.
 
 ### False-negative policy
 
-Runtime-dependent behaviour (hook execution ordering, dynamic variable expansion, CC's merge/de-dup logic) cannot be statically inferred. v0.2 expands env-var and script-path handling compared with v0.1, but still uses heuristic static analysis rather than runtime interception. See `src/policies.ts` for the full list.
+Runtime-dependent behaviour (hook execution ordering, dynamic variable expansion, CC's merge/de-dup logic) cannot be statically inferred. v0.2.1 expands env-var and script-path handling compared with v0.1, but still uses heuristic static analysis rather than runtime interception. Detector time budgets are also policy-based rather than workload-adaptive, so unusually large environments may still need manual tuning via `CLAUDIT_DETECTOR_TIMEOUT_MS`. See `src/policies.ts` for the full list.
 
 ## Scan output shape
 
@@ -206,7 +209,7 @@ src/
   plugin-identity.ts          # marketplace-qualified plugin identity helpers
   hooks/                      # compiled hook entry points
   commands/                   # /claudit scan CLI entry
-  policies.ts                 # budgets, namespace severity defaults, redaction policy constants
+  policies.ts                 # detector budgets, namespace severity defaults, redaction policy constants
 dist/                         # tsup output — .mjs entry points referenced by hooks.json
 tests/
   e2e/                        # real-world scenarios
