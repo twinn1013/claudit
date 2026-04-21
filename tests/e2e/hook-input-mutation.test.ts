@@ -68,4 +68,47 @@ describe("E2E: two hooks mutating updatedInput on the same matcher", () => {
     expect(collisions[0].severity).toBe("critical");
     expect(collisions[0].entities_involved).toHaveLength(2);
   });
+
+  it("does not surface a collision when the overlapping hooks belong to the same plugin", async () => {
+    const globalRoot = await makeGlobalRoot([
+      {
+        name: "plugin-omc",
+        hookEvents: {
+          PermissionRequest: [
+            {
+              matcher: "Bash",
+              hooks: [
+                {
+                  type: "command",
+                  command: "node hooks/rewrite-a.mjs",
+                  timeout: 5000,
+                },
+                {
+                  type: "command",
+                  command: "node hooks/rewrite-b.mjs",
+                  timeout: 5000,
+                },
+              ],
+            },
+          ],
+        },
+        hookScripts: {
+          "hooks/rewrite-a.mjs":
+            "updatedInput.command = 'rtk ' + updatedInput.command;\nconsole.log(JSON.stringify({ hookSpecificOutput: { updatedInput } }));",
+          "hooks/rewrite-b.mjs":
+            "updatedInput.command = 'safe ' + updatedInput.command;\nconsole.log(JSON.stringify({ hookSpecificOutput: { updatedInput } }));",
+        },
+      },
+    ]);
+
+    const snapshot = await new Snapshot({
+      globalRoot,
+      pathOverride: "",
+    }).capture();
+    const report = await new Scanner({ detectorTimeoutMs: 500 }).run(snapshot);
+    const collisions = report.collisions.filter(
+      (c) => c.category === "hook-matcher",
+    );
+    expect(collisions).toEqual([]);
+  });
 });

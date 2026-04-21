@@ -103,6 +103,79 @@ describe("EC1 — cross-source * / * both mutating", () => {
   });
 });
 
+describe("self-overlap filtering", () => {
+  it("does not report two hooks from the same settings source on the same matcher", async () => {
+    const snap = emptySnapshot({
+      settingsHooks: [
+        {
+          event: "PermissionRequest",
+          matcher: "Bash",
+          source: "user-settings",
+          hooks: [
+            mutatingScript({ command: "hook-a" }),
+            mutatingScript({ command: "hook-b" }),
+          ],
+        },
+      ],
+    });
+
+    const collisions = await new HookMatcherDetector().analyze(snap);
+    expect(collisions).toEqual([]);
+  });
+
+  it("does not report overlap when the same plugin appears through two installation sources", async () => {
+    const snap = emptySnapshot({
+      plugins: [
+        {
+          name: "oh-my-claudecode",
+          marketplace: "omc",
+          qualifiedName: "oh-my-claudecode@omc",
+          pluginRoot: "/plugins/cache/omc/oh-my-claudecode/1.0.0",
+          source: "plugin-cache",
+          enabled: true,
+          hookEvents: {
+            PreCompact: [
+              {
+                matcher: "*",
+                source: "plugin-cache",
+                hooks: [readonlyScript({ command: "cache-hook", scriptSource: "" })],
+              },
+            ],
+          },
+          commands: [],
+          skills: [],
+          agents: [],
+          mcpServers: [],
+        },
+        {
+          name: "oh-my-claudecode",
+          marketplace: "omc",
+          qualifiedName: "oh-my-claudecode@omc",
+          pluginRoot: "/plugins/marketplaces/omc",
+          source: "plugin-marketplace",
+          enabled: true,
+          hookEvents: {
+            PreCompact: [
+              {
+                matcher: "*",
+                source: "plugin-marketplace",
+                hooks: [readonlyScript({ command: "marketplace-hook", scriptSource: "" })],
+              },
+            ],
+          },
+          commands: [],
+          skills: [],
+          agents: [],
+          mcpServers: [],
+        },
+      ],
+    });
+
+    const collisions = await new HookMatcherDetector().analyze(snap);
+    expect(collisions).toEqual([]);
+  });
+});
+
 describe("EC1c — same plugin name across marketplaces stays distinct in hook entities", () => {
   it("uses marketplace-qualified plugin identities for hook entities", async () => {
     const snap = emptySnapshot({
@@ -279,10 +352,13 @@ describe("EC5 — two explicit updatedInput.command assignments → definite", (
           event: "PreToolUse",
           matcher: "Bash",
           source: "user-settings",
-          hooks: [
-            mutatingScript({ command: "hook-a", scriptSource: "updatedInput.command = 'A';" }),
-            mutatingScript({ command: "hook-b", scriptSource: "updatedInput.command = 'B';" }),
-          ],
+          hooks: [mutatingScript({ command: "hook-a", scriptSource: "updatedInput.command = 'A';" })],
+        },
+        {
+          event: "PreToolUse",
+          matcher: "Bash",
+          source: "project-settings",
+          hooks: [mutatingScript({ command: "hook-b", scriptSource: "updatedInput.command = 'B';" })],
         },
       ],
     });

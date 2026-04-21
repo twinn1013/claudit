@@ -97,6 +97,8 @@ function stripComments(source: string): string {
 interface HookAtMatcher {
   /** Entity string used in entities_involved. */
   entity: string;
+  /** Same-owner entries are configuration siblings, not collisions. */
+  owner: string;
   /** False when the hook comes from a currently disabled plugin. */
   enabled: boolean;
   /** Hook source scope. */
@@ -225,6 +227,7 @@ function flattenAllHooks(snapshot: SnapshotData): HookAtMatcher[] {
           const entity = `${pluginOrigin(plugin)}:${event}:${rawMatcher}`;
           entries.push({
             entity,
+            owner: `plugin:${pluginOrigin(plugin)}`,
             enabled: plugin.enabled,
             source: reg.source,
             event,
@@ -248,6 +251,7 @@ function flattenAllHooks(snapshot: SnapshotData): HookAtMatcher[] {
       const entity = `${entry.source}:${entry.event}:${rawMatcher}`;
       entries.push({
         entity,
+        owner: `settings:${entry.source}`,
         enabled: true,
         source: entry.source,
         event: entry.event,
@@ -300,6 +304,7 @@ function maximalCliques(entries: HookAtMatcher[]): HookAtMatcher[][] {
 
   for (let i = 0; i < entries.length; i++) {
     for (let j = i + 1; j < entries.length; j++) {
+      if (entries[i].owner === entries[j].owner) continue;
       if (matchersOverlap(entries[i].parsedMatcher, entries[j].parsedMatcher)) {
         adjacency.get(entries[i])?.add(entries[j]);
         adjacency.get(entries[j])?.add(entries[i]);
