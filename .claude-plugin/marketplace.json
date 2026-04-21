@@ -9,8 +9,11 @@
     {
       "name": "claudit",
       "description": "Detects configuration conflicts across installed Claude Code plugins, hooks, commands, MCP servers, and PATH binaries, and surfaces them as Claude-parsable reports.",
-      "version": "0.2.0",
-      "source": ".",
+      "version": "0.2.1",
+      "source": {
+        "source": "./",
+        "type": "local"
+      },
       "keywords": [
         "claude-code",
         "plugin",
